@@ -1,0 +1,25 @@
+timezone: America/New_York
+market_calendar: NYSE
+
+model:
+  name: ProsusAI/finbert
+  revision: main
+  batch_size: 16
+  device: cpu
+
+ingestion:
+  price_period: 12mo
+  price_interval: 1d
+  reddit_comment_limit: 50
+  news_page_size: 100
+
+analysis:
+  lags: [0, 1, 2]
+  min_observations: 60
+  max_granger_lag: 5
+  fdr_alpha: 0.05
+
+storage:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  cache_dir: data/cache

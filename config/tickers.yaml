@@ -1,0 +1,11 @@
+tickers:
+  - NVDA
+  - TSLA
+  - AAPL
+  - MSFT
+  - AMZN
+
+subreddits:
+  - wallstreetbets
+  - stocks
+  - investing

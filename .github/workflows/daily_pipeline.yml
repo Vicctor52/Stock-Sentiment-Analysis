@@ -1,0 +1,30 @@
+name: daily-pipeline
+
+on:
+  workflow_dispatch:
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ hashFiles('requirements-pipeline.txt') }}
+      - run: uv venv --python 3.12
+      - run: uv pip sync requirements-pipeline.txt
+      - run: uv run python -m finsent ingest
+        env:
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          REDDIT_USER_AGENT: ${{ secrets.REDDIT_USER_AGENT }}
+          NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+      - run: uv run python -m finsent score
+      - run: uv run python -m finsent analyze
