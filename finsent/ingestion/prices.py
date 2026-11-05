@@ -61,6 +61,7 @@ def _download_ticker(ticker: str, period: str, interval: str) -> pd.DataFrame:
     )
 
 
+# Change in case of wanting to implement different timezones data for the prices
 def _normalize_session_dates(values: pd.Series) -> pd.Series:
     """Normalize timestamps to timezone-naive trading dates.
 
