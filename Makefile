@@ -2,11 +2,11 @@
 
 sync:
 	uv venv --python 3.12
-	uv pip sync requirements-pipeline.txt
+	uv pip install -r requirements-pipeline.txt
 
 sync-dashboard:
 	uv venv .venv-dashboard --python 3.12
-	uv pip sync --python .venv-dashboard requirements.txt
+	uv pip install --python .venv-dashboard -r requirements.txt
 
 lint:
 	uv run ruff check .

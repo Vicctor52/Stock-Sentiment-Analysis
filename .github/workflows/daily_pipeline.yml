@@ -19,7 +19,7 @@ jobs:
           path: ~/.cache/huggingface
           key: hf-${{ hashFiles('requirements-pipeline.txt') }}
       - run: uv venv --python 3.12
-      - run: uv pip sync requirements-pipeline.txt
+      - run: uv pip install -r requirements-pipeline.txt
       - run: uv run python -m finsent ingest
         env:
           REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}

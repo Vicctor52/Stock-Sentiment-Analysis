@@ -1,14 +1,14 @@
 -r requirements.txt
 
+requests>=2.31
 yfinance>=0.2.50
 praw>=7.7
 newsapi-python>=0.2.7
 python-dotenv>=1.0
 tenacity>=9.0
 
-transformers>=4.45
+transformers>=4.45,<5
 torch==2.5.1+cpu
---extra-index-url https://download.pytorch.org/whl/cpu
 
 scipy>=1.14
 statsmodels>=0.14

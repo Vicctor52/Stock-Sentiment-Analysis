@@ -43,7 +43,7 @@ tests/         pruebas unitarias y sinteticas
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 uv venv --python 3.12
-uv pip sync requirements-pipeline.txt
+uv pip install -r requirements-pipeline.txt
 ```
 
 ## Uso
