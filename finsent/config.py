@@ -43,14 +43,38 @@ class Settings(BaseModel):
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
+    """Load a YAML file into a dictionary.
+
+    Args:
+        path: Path to the YAML file.
+
+    Returns:
+        The parsed YAML content.
+    """
     with path.open("r", encoding="utf-8") as handle:
         return yaml.safe_load(handle)
 
 
 @lru_cache
 def load_settings(path: str = "config/settings.yaml") -> Settings:
+    """Load and validate pipeline settings from a YAML file.
+
+    Args:
+        path: Path to the settings file.
+
+    Returns:
+        The validated pipeline settings. Results are cached by path.
+    """
     return Settings.model_validate(load_yaml(Path(path)))
 
 
 def load_tickers(path: str = "config/tickers.yaml") -> dict[str, list[str]]:
+    """Load ticker and subreddit configuration from a YAML file.
+
+    Args:
+        path: Path to the ticker configuration file.
+
+    Returns:
+        A mapping of configuration names to lists of values.
+    """
     return load_yaml(Path(path))

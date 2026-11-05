@@ -32,7 +32,7 @@ _COLUMN_MAP = {
 
 
 class PriceFetchError(RuntimeError):
-    pass
+    """Raised when price data cannot be fetched or validated."""
 
 
 @retry(
@@ -41,6 +41,19 @@ class PriceFetchError(RuntimeError):
     reraise=True,
 )
 def _download_ticker(ticker: str, period: str, interval: str) -> pd.DataFrame:
+    """Download historical prices for a single ticker.
+
+    Args:
+        ticker: Ticker symbol to query.
+        period: Lookback period accepted by yfinance, such as ``"12mo"``.
+        interval: Bar interval accepted by yfinance, such as ``"1d"``.
+
+    Returns:
+        Raw price history returned by yfinance.
+
+    Raises:
+        Exception: Re-raised after the configured retry attempts are exhausted.
+    """
     return yf.Ticker(ticker).history(
         period=period,
         interval=interval,
@@ -49,6 +62,14 @@ def _download_ticker(ticker: str, period: str, interval: str) -> pd.DataFrame:
 
 
 def _normalize_session_dates(values: pd.Series) -> pd.Series:
+    """Normalize timestamps to timezone-naive trading dates.
+
+    Args:
+        values: Timestamp-like values to normalize.
+
+    Returns:
+        A series with timezone information removed and time set to midnight.
+    """
     dates = pd.to_datetime(values)
     if dates.dt.tz is not None:
         dates = dates.dt.tz_localize(None)
@@ -56,6 +77,20 @@ def _normalize_session_dates(values: pd.Series) -> pd.Series:
 
 
 def _fetch_single_ticker(ticker: str, period: str, interval: str) -> pd.DataFrame:
+    """Fetch and normalize price history for one ticker.
+
+    Args:
+        ticker: Ticker symbol to query.
+        period: Lookback period accepted by yfinance.
+        interval: Bar interval accepted by yfinance.
+
+    Returns:
+        A normalized frame with the standard price columns.
+
+    Raises:
+        PriceFetchError: If the download fails, returns no data, or lacks
+            required columns or valid close prices.
+    """
     try:
         raw = _download_ticker(ticker, period, interval)
     except Exception as exc:
@@ -84,6 +119,17 @@ def _fetch_single_ticker(ticker: str, period: str, interval: str) -> pd.DataFram
 
 
 def _validate(frame: pd.DataFrame) -> pd.DataFrame:
+    """Drop rows with invalid prices, ranges, or volumes.
+
+    Args:
+        frame: Price frame with normalized numeric columns.
+
+    Returns:
+        The frame without invalid rows.
+
+    Raises:
+        PriceFetchError: If no valid rows remain.
+    """
     invalid_prices = (
         (frame["open"] < 0)
         | (frame["high"] < 0)
@@ -110,6 +156,21 @@ def fetch_prices(
     period: str = "12mo",
     interval: str = "1d",
 ) -> pd.DataFrame:
+    """Fetch, normalize, deduplicate, and validate prices for multiple tickers.
+
+    Args:
+        tickers: Ticker symbols to fetch.
+        period: Lookback period accepted by yfinance.
+        interval: Bar interval accepted by yfinance.
+
+    Returns:
+        A concatenated frame with the columns defined in ``PRICES_COLUMNS``,
+        sorted by ticker and session date.
+
+    Raises:
+        ValueError: If ``tickers`` is empty.
+        PriceFetchError: If every ticker fails to return valid data.
+    """
     if not tickers:
         raise ValueError("At least one ticker is required")
 
