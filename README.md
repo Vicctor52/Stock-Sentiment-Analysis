@@ -65,6 +65,5 @@ cp .env.example .env
 ## Estado
 
 Proyecto centrado exclusivamente en noticias y precios. Las fuentes sociales y los
-formularios regulatorios quedan fuera del alcance. La ingesta de precios esta
-implementada; la ingesta de noticias, NLP, analisis y dashboard se completan de forma
-incremental.
+formularios regulatorios quedan fuera del alcance. La ingesta de precios y noticias esta
+implementada; NLP, analisis y dashboard se completan de forma incremental.

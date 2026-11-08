@@ -1,8 +1,11 @@
 import typer
+from dotenv import load_dotenv
 
 from finsent.pipeline.analyze import run_analysis
 from finsent.pipeline.ingest import run_ingestion
 from finsent.pipeline.score import run_scoring
+
+load_dotenv()
 
 app = typer.Typer(help="Financial Sentiment Lab pipeline.")
 

@@ -3,13 +3,20 @@ from pathlib import Path
 import pandas as pd
 
 from finsent.logging import get_logger
-from finsent.storage.schemas import PRICES_COLUMNS
+from finsent.storage.schemas import NEWS_ARTICLES_COLUMNS, PRICES_COLUMNS
 
 logger = get_logger(__name__)
+
+# Mapping of table names to their expected column order.
+TABLE_COLUMNS = {
+    "prices": PRICES_COLUMNS,
+    "news": NEWS_ARTICLES_COLUMNS,
+}
 
 # Mapping of table names to their primary key column(s) for deduplication.
 TABLE_PRIMARY_KEYS = {
     "prices": ["ticker", "session_date"],
+    "news": ["article_id", "ticker"],
 }
 
 
@@ -34,6 +41,24 @@ class ParquetStore:
 
     def _table_path(self, table: str) -> Path:
         return self.root / f"{table}.parquet"
+
+    def _columns(self, table: str) -> list[str]:
+        """Return the expected column order for *table*.
+
+        Parameters
+        ----------
+        table : str
+            Name of the table (must be a key in :data:`TABLE_COLUMNS`).
+
+        Returns
+        -------
+        list[str]
+            Column names in schema order.
+        """
+        columns = TABLE_COLUMNS.get(table)
+        if columns is None:
+            raise KeyError(f"Unknown table '{table}'; no columns defined.")
+        return columns
 
     def _primary_keys(self, table: str) -> list[str]:
         """Return the primary key column(s) for *table*.
@@ -63,32 +88,34 @@ class ParquetStore:
         Parameters
         ----------
         table : str
-            Name of the table (e.g. ``"prices"``).
+            Name of the table (e.g. ``"prices"`` or ``"news"``).
         frame : pd.DataFrame
-            Data to persist. Must contain the columns required by the table's
-            schema (validated silently; missing columns are filled with ``NaN``).
+            Data to persist. Missing schema columns are filled with ``NaN``.
         """
-        # Ensure required columns exist; fill missing ones with NaN so that
-        # deduplication on the key columns still works.
-        required = PRICES_COLUMNS if table == "prices" else []
-        for col in required:
-            if col not in frame.columns:
-                frame[col] = pd.NA
-
+        columns = self._columns(table)
+        keys = self._primary_keys(table)
         path = self._table_path(table)
 
-        # Load existing data if present.
+        new_data = frame.copy()
+        for col in columns:
+            if col not in new_data.columns:
+                new_data[col] = pd.NA
+        new_data = new_data.reindex(columns=columns)
+
         if path.exists():
             existing = pd.read_parquet(path)
-            # Combine existing + new.
-            combined = pd.concat([existing, frame], ignore_index=True)
+            for col in columns:
+                if col not in existing.columns:
+                    existing[col] = pd.NA
+            existing = existing.reindex(columns=columns)
+            combined = pd.concat([existing, new_data], ignore_index=True)
         else:
-            combined = frame
+            combined = new_data
 
-        keys = self._primary_keys(table)
-        # Drop duplicates keeping the last row for each key combination.
+        combined = combined.reindex(columns=columns)
         combined = combined.drop_duplicates(subset=keys, keep="last")
 
+        path.parent.mkdir(parents=True, exist_ok=True)
         combined.to_parquet(path, index=False)
         logger.info("Wrote %d rows to %s", len(combined), path)
 
@@ -98,7 +125,7 @@ class ParquetStore:
         Parameters
         ----------
         table : str
-            Name of the table (e.g. ``"prices"``).
+            Name of the table (e.g. ``"prices"`` or ``"news"``).
 
         Returns
         -------
@@ -108,4 +135,9 @@ class ParquetStore:
         path = self._table_path(table)
         if not path.exists():
             raise FileNotFoundError(f"Table '{table}' not found at {path}")
-        return pd.read_parquet(path)
+
+        frame = pd.read_parquet(path)
+        columns = TABLE_COLUMNS.get(table)
+        if columns is not None:
+            frame = frame.reindex(columns=columns)
+        return frame
