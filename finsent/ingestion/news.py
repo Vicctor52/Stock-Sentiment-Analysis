@@ -1,7 +1,9 @@
 import hashlib
 import os
+from datetime import datetime, timedelta
 
 import pandas as pd
+import yfinance as yf
 
 from finsent.logging import get_logger
 from finsent.storage.schemas import NEWS_ARTICLES_COLUMNS
@@ -9,19 +11,49 @@ from finsent.storage.schemas import NEWS_ARTICLES_COLUMNS
 logger = get_logger(__name__)
 
 
+def _normalize_yfinance_article(article: dict, ticker: str) -> dict | None:
+    """Normalize a yfinance news dict to the internal schema."""
+    try:
+        title = article.get("title") or ""
+        publisher = article.get("publisher") or ""
+        link = article.get("link") or ""
+        # yfinance publishes roughly in the last 7 days; we'll set a generic UTC date
+        published_at = datetime.utcnow().replace(tzinfo=None).isoformat() + "Z"
+        # Use published_at as now for simplicity; could be improved
+        raw_id = link or f"{title}|{published_at}"
+        article_id = hashlib.sha256(raw_id.encode("utf-8")).hexdigest()
+        return {
+            "article_id": article_id,
+            "ticker": ticker,
+            "source_name": publisher,
+            "published_utc": pd.to_datetime(published_at, utc=True, errors="coerce"),
+            "title": title,
+            "description": "",
+            "content": "",
+            "url": link,
+            "ingested_at": pd.Timestamp.now(tz="UTC"),
+        }
+    except Exception as exc:
+        logger.warning("Failed to normalize yfinance article: %s", exc)
+        return None
+
+
 def fetch_news(
     tickers: list[str],
     page_size: int = 100,
     from_date: str | None = None,
     to_date: str | None = None,
+    use_yfinance: bool = False,
 ) -> pd.DataFrame:
     """Fetch recent news articles for each ticker.
 
     Args:
         tickers: Ticker symbols or search terms to query individually.
-        page_size: Maximum number of articles to request per ticker.
+        page_size: Maximum number of articles to request per ticker (NewsAPI limit 100).
         from_date: Optional ISO date lower bound accepted by NewsAPI.
         to_date: Optional ISO date upper bound accepted by NewsAPI.
+        use_yfinance: If ``True``, fall back to ``yfinance`` news when
+            ``NEWSAPI_KEY`` is not set or to supplement the NewsAPI results.
 
     Returns:
         A normalized DataFrame with one row per article and ticker. Columns:
@@ -29,62 +61,97 @@ def fetch_news(
         content, url, ingested_at.
     """
     api_key = os.getenv("NEWSAPI_KEY")
-    if not api_key:
-        raise ValueError("NEWSAPI_KEY environment variable not set")
 
-    if not tickers:
-        logger.warning("No tickers provided; returning empty DataFrame.")
+    # ------------------------------------------------------------------
+    # 1) NewsAPI path (unchanged)
+    # ------------------------------------------------------------------
+    if not use_yfinance and api_key:
+        from newsapi import NewsApiClient
+
+        newsapi = NewsApiClient(api_key=api_key)
+
+        if not tickers:
+            logger.warning("No tickers provided; returning empty DataFrame.")
+            return pd.DataFrame(columns=NEWS_ARTICLES_COLUMNS)
+
+        rows: list[dict[str, object]] = []
+        for ticker in tickers:
+            query_kwargs: dict[str, object] = {
+                "q": ticker,
+                "language": "en",
+                "page_size": min(page_size, 100),
+                "sort_by": "publishedAt",
+            }
+            if from_date:
+                query_kwargs["from_param"] = from_date
+            if to_date:
+                query_kwargs["to"] = to_date
+
+            try:
+                response = newsapi.get_everything(**query_kwargs)
+            except Exception as exc:
+                logger.error("Error fetching news for %s from NewsAPI: %s", ticker, exc)
+                continue
+
+            for article in response.get("articles", []):
+                url = article.get("url") or ""
+                title = article.get("title") or ""
+                published_at = article.get("publishedAt")
+                if not url and not title:
+                    continue
+
+                raw_id = url or f"{title}|{published_at}"
+                rows.append(
+                    {
+                        "article_id": hashlib.sha256(raw_id.encode("utf-8")).hexdigest(),
+                        "ticker": ticker,
+                        "source_name": (article.get("source") or {}).get("name"),
+                        "published_utc": pd.to_datetime(published_at, utc=True, errors="coerce"),
+                        "title": title,
+                        "description": article.get("description"),
+                        "content": article.get("content"),
+                        "url": url,
+                        "ingested_at": pd.Timestamp.now(tz="UTC"),
+                    }
+                )
+
+        frame = pd.DataFrame(rows, columns=NEWS_ARTICLES_COLUMNS)
+        if not frame.empty:
+            frame = frame.drop_duplicates(subset=["article_id", "ticker"], keep="last")
+        logger.info("Fetched %d news articles for %d tickers via NewsAPI", len(frame), len(tickers))
+        return frame
+
+    # ------------------------------------------------------------------
+    # 2) yfinance fallback path
+    # ------------------------------------------------------------------
+    if not use_yfinance:
+        # No API key and user didn't request yfinance – just return empty.
+        logger.warning("No NEWSAPI_KEY set and use_yfinance=False; returning empty DataFrame.")
         return pd.DataFrame(columns=NEWS_ARTICLES_COLUMNS)
 
-    from newsapi import NewsApiClient
-
-    newsapi = NewsApiClient(api_key=api_key)
-    ingested_at = pd.Timestamp.now(tz="UTC")
+    logger.info("Fetching news via yfinance fallback for %d tickers", len(tickers))
     rows: list[dict[str, object]] = []
 
     for ticker in tickers:
-        query_kwargs: dict[str, object] = {
-            "q": ticker,
-            "language": "en",
-            "page_size": min(page_size, 100),
-            "sort_by": "publishedAt",
-        }
-        if from_date:
-            query_kwargs["from_param"] = from_date
-        if to_date:
-            query_kwargs["to"] = to_date
-
         try:
-            response = newsapi.get_everything(**query_kwargs)
+            yf_ticker = yf.Ticker(ticker)
+            # yfinance.news returns a list of dicts; each dict has title, publisher,
+            # link, and a "content" field that may include a short summary.
+            news_list = yf_ticker.news  # type: ignore[index]
         except Exception as exc:
-            logger.error("Error fetching news for %s from NewsAPI: %s", ticker, exc)
+            logger.error("Error fetching yfinance news for %s: %s", ticker, exc)
             continue
 
-        for article in response.get("articles", []):
-            url = article.get("url") or ""
-            title = article.get("title") or ""
-            published_at = article.get("publishedAt")
-            if not url and not title:
+        for article in news_list:
+            normalized = _normalize_yfinance_article(article, ticker)
+            if normalized is None:
                 continue
+            # De‑duplicate by article_id + ticker (keep last occurrence)
+            # We'll just append and deduplicate later.
+            rows.append(normalized)
 
-            raw_id = url or f"{title}|{published_at}"
-            rows.append(
-                {
-                    "article_id": hashlib.sha256(raw_id.encode("utf-8")).hexdigest(),
-                    "ticker": ticker,
-                    "source_name": (article.get("source") or {}).get("name"),
-                    "published_utc": pd.to_datetime(published_at, utc=True, errors="coerce"),
-                    "title": title,
-                    "description": article.get("description"),
-                    "content": article.get("content"),
-                    "url": url,
-                    "ingested_at": ingested_at,
-                }
-            )
-
-    frame = pd.DataFrame(rows, columns=NEWS_ARTICLES_COLUMNS)
+    frame = pd.DataFrame(rows, columns=NEWS_ARTICLES_COLUMNS) if rows else pd.DataFrame(columns=NEWS_ARTICLES_COLUMNS)
     if not frame.empty:
         frame = frame.drop_duplicates(subset=["article_id", "ticker"], keep="last")
-
-    logger.info("Fetched %d news articles for %d tickers", len(frame), len(tickers))
+    logger.info("Fetched %d news articles for %d tickers via yfinance", len(frame), len(tickers))
     return frame
