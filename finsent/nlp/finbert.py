@@ -1,5 +1,3 @@
-import torch
-
 import pandas as pd
 
 from finsent.logging import get_logger
@@ -29,26 +27,21 @@ class FinBertScorer:
         Args:
             model_name: Hugging Face model identifier.
             revision: Model revision to load.
-            device: Torch device used for inference. If ``None``, ``"cuda"``
-                is used when available, otherwise ``"cpu"``.
+            device: Torch device used for inference. If ``None``, ``"cpu"``
+                is used (GPU support can be added later).
             batch_size: Number of texts processed per batch.
         """
         self.model_name = model_name
         self.revision = revision
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = device or "cpu"
         self.batch_size = max(1, batch_size)
         self._tokenizer = None
         self._model = None
         self._labels: dict[int, str] = {}
 
-        if self.device == "cuda":
-            logger.info("FinBERT will run on CUDA device: %s", self.device)
-            torch.backends.cudnn.benchmark = True
-        else:
-            logger.info("FinBERT will run on CPU device: %s", self.device)
-
     def _load_model(self) -> None:
         """Load the tokenizer and model on first use."""
+
         if self._model is not None and self._tokenizer is not None:
             return
 
@@ -83,6 +76,8 @@ class FinBertScorer:
         Returns:
             A frame with label, positive, negative, neutral, and compound scores.
         """
+        import torch
+
         columns = ["label", "p_pos", "p_neg", "p_neu", "score"]
         if not texts:
             return pd.DataFrame(columns=columns)

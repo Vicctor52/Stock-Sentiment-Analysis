@@ -7,9 +7,7 @@ from finsent.storage.schemas import RETURNS_COLUMNS
 
 
 def _prices() -> pd.DataFrame:
-    dates = pd.to_datetime(
-        ["2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"]
-    )
+    dates = pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"])
     return pd.DataFrame(
         {
             "ticker": ["AAPL"] * 4 + ["MSFT"] * 4,
@@ -30,9 +28,7 @@ def test_compute_log_returns_per_ticker() -> None:
     assert aapl.loc[1, "log_return"] == pytest.approx(np.log(1.1))
     assert aapl.loc[3, "log_return"] == pytest.approx(np.log(1.1))
     assert aapl.loc[0, "fwd_return_1"] == pytest.approx(np.log(1.1))
-    assert aapl.loc[3, "fwd_return_1"] is np.nan or pd.isna(
-        aapl.loc[3, "fwd_return_1"]
-    )
+    assert aapl.loc[3, "fwd_return_1"] is np.nan or pd.isna(aapl.loc[3, "fwd_return_1"])
     assert aapl.loc[0, "fwd_return_2"] == pytest.approx(np.log(1.21))
     assert pd.isna(aapl.loc[2, "fwd_return_2"])
 

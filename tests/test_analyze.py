@@ -28,11 +28,9 @@ def _prices() -> pd.DataFrame:
         returns = rng.normal(scale=0.01, size=30)
         prices = 100.0 * np.exp(np.cumsum(returns))
         for date, price in zip(
-            pd.date_range("2024-01-02", periods=30, freq="B"), prices
+            pd.date_range("2024-01-02", periods=30, freq="B"), prices, strict=False
         ):
-            rows.append(
-                {"ticker": ticker, "session_date": date, "adj_close": float(price)}
-            )
+            rows.append({"ticker": ticker, "session_date": date, "adj_close": float(price)})
     return pd.DataFrame(rows)
 
 
@@ -43,6 +41,7 @@ def _sentiment() -> pd.DataFrame:
         for date, value in zip(
             pd.date_range("2024-01-02", periods=30, freq="B"),
             rng.normal(size=30),
+            strict=False,
         ):
             rows.append(
                 {

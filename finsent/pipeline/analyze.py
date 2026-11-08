@@ -37,9 +37,7 @@ def run_analysis() -> None:
         how="inner",
         validate="many_to_one",
     )
-    features = features.sort_values(["ticker", "source", "session_date"]).reset_index(
-        drop=True
-    )
+    features = features.sort_values(["ticker", "source", "session_date"]).reset_index(drop=True)
 
     lead_lag = lead_lag_correlation(
         features,

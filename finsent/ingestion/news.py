@@ -1,6 +1,6 @@
 import hashlib
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import pandas as pd
 import yfinance as yf
@@ -61,6 +61,9 @@ def fetch_news(
         content, url, ingested_at.
     """
     api_key = os.getenv("NEWSAPI_KEY")
+
+    if not use_yfinance and not api_key:
+        raise ValueError("NEWSAPI_KEY environment variable not set")
 
     # ------------------------------------------------------------------
     # 1) NewsAPI path (unchanged)
@@ -150,7 +153,10 @@ def fetch_news(
             # We'll just append and deduplicate later.
             rows.append(normalized)
 
-    frame = pd.DataFrame(rows, columns=NEWS_ARTICLES_COLUMNS) if rows else pd.DataFrame(columns=NEWS_ARTICLES_COLUMNS)
+    if rows:
+        frame = pd.DataFrame(rows, columns=NEWS_ARTICLES_COLUMNS)
+    else:
+        frame = pd.DataFrame(columns=NEWS_ARTICLES_COLUMNS)
     if not frame.empty:
         frame = frame.drop_duplicates(subset=["article_id", "ticker"], keep="last")
     logger.info("Fetched %d news articles for %d tickers via yfinance", len(frame), len(tickers))

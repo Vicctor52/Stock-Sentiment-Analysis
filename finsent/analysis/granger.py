@@ -49,8 +49,7 @@ def granger_causality(
             continue
         if len(data) <= 3 * maxlag + 1:
             logger.warning(
-                "Skipping Granger test for %s/%s: %d observations are insufficient "
-                "for maxlag=%d.",
+                "Skipping Granger test for %s/%s: %d observations are insufficient for maxlag=%d.",
                 ticker,
                 source,
                 len(data),
@@ -84,9 +83,5 @@ def granger_causality(
         return pd.DataFrame(columns=GRANGER_COLUMNS)
 
     results = pd.DataFrame(rows, columns=GRANGER_COLUMNS)
-    results["adjusted_p"] = adjust_pvalues(
-        results["p_value"].tolist(), alpha=fdr_alpha
-    )
-    return results.sort_values(
-        ["ticker", "source", "maxlag", "lag", "test"]
-    ).reset_index(drop=True)
+    results["adjusted_p"] = adjust_pvalues(results["p_value"].tolist(), alpha=fdr_alpha)
+    return results.sort_values(["ticker", "source", "maxlag", "lag", "test"]).reset_index(drop=True)

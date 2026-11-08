@@ -80,9 +80,7 @@ def lead_lag_correlation(
                 continue
 
             for method in methods:
-                correlation, p_value = _correlation(
-                    paired["sentiment"], paired["returns"], method
-                )
+                correlation, p_value = _correlation(paired["sentiment"], paired["returns"], method)
                 if not np.isfinite(correlation):
                     continue
                 ci_low, ci_high = fisher_confidence_interval(
@@ -107,9 +105,5 @@ def lead_lag_correlation(
         return pd.DataFrame(columns=LEAD_LAG_COLUMNS)
 
     results = pd.DataFrame(rows, columns=LEAD_LAG_COLUMNS)
-    results["adjusted_p"] = adjust_pvalues(
-        results["p_value"].tolist(), alpha=fdr_alpha
-    )
-    return results.sort_values(["ticker", "source", "method", "lag"]).reset_index(
-        drop=True
-    )
+    results["adjusted_p"] = adjust_pvalues(results["p_value"].tolist(), alpha=fdr_alpha)
+    return results.sort_values(["ticker", "source", "method", "lag"]).reset_index(drop=True)

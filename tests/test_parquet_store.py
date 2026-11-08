@@ -6,11 +6,8 @@ import pytest
 from finsent.storage.parquet_store import ParquetStore
 from finsent.storage.schemas import (
     DAILY_SENTIMENT_COLUMNS,
-    GRANGER_COLUMNS,
-    LEAD_LAG_COLUMNS,
     NEWS_ARTICLES_COLUMNS,
     PRICES_COLUMNS,
-    RETURNS_COLUMNS,
     SENTIMENT_COLUMNS,
 )
 

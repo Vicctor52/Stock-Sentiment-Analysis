@@ -17,9 +17,7 @@ def _features(n_observations: int = 80) -> pd.DataFrame:
         {
             "ticker": ["NVDA"] * n_observations,
             "source": ["news"] * n_observations,
-            "session_date": pd.date_range(
-                "2024-01-02", periods=n_observations, freq="B"
-            ),
+            "session_date": pd.date_range("2024-01-02", periods=n_observations, freq="B"),
             "sentiment_index": sentiment,
             "log_return": returns,
         }
