@@ -54,6 +54,11 @@ uv run python -m finsent analyze
 uv run streamlit run streamlit_app.py
 ```
 
+El dashboard lee los Parquet de `data/processed` y muestra el sentimiento y los
+retornos diarios, además de los resultados lead-lag y Granger. Usa **Recargar datos**
+en la barra lateral tras regenerar los resultados. Si faltan tablas, la app indica
+qué etapas del pipeline debes ejecutar.
+
 ## Variables de entorno
 
 Copia `.env.example` a `.env` y completa las credenciales.
@@ -66,5 +71,5 @@ cp .env.example .env
 
 Proyecto centrado exclusivamente en noticias y precios. Las fuentes sociales y los
 formularios regulatorios quedan fuera del alcance. La ingesta de precios y noticias, el
-scoring FinBERT y la agregacion diaria estan implementados; retornos, lead-lag, Granger y
-dashboard se completan de forma incremental.
+scoring FinBERT, la agregacion diaria, el analisis de retornos, lead-lag y Granger estan
+implementados y conectados al dashboard.
