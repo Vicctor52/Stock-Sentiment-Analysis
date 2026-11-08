@@ -58,6 +58,7 @@ class ParquetStore:
         self.root = root
 
     def _table_path(self, table: str) -> Path:
+        """Return the path for a named Parquet table."""
         return self.root / f"{table}.parquet"
 
     def _columns(self, table: str) -> list[str]:

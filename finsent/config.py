@@ -7,6 +7,8 @@ from pydantic import BaseModel
 
 
 class ModelConfig(BaseModel):
+    """Configuration for the sentiment model and inference settings."""
+
     name: str
     revision: str
     batch_size: int
@@ -14,12 +16,16 @@ class ModelConfig(BaseModel):
 
 
 class IngestionConfig(BaseModel):
+    """Configuration for external data ingestion."""
+
     price_period: str
     price_interval: str
     news_page_size: int
 
 
 class AnalysisConfig(BaseModel):
+    """Configuration for statistical analysis."""
+
     lags: list[int]
     min_observations: int
     max_granger_lag: int
@@ -27,12 +33,16 @@ class AnalysisConfig(BaseModel):
 
 
 class StorageConfig(BaseModel):
+    """Filesystem locations for pipeline data."""
+
     raw_dir: Path
     processed_dir: Path
     cache_dir: Path
 
 
 class Settings(BaseModel):
+    """Validated application settings loaded from YAML configuration."""
+
     timezone: str
     market_calendar: str
     model: ModelConfig

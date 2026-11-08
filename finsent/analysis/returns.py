@@ -5,6 +5,7 @@ from finsent.storage.schemas import RETURNS_COLUMNS
 
 
 def _resolve_column(frame: pd.DataFrame, candidates: tuple[str, ...], label: str) -> str:
+    """Return the first available candidate column or raise a descriptive error."""
     for candidate in candidates:
         if candidate in frame.columns:
             return candidate

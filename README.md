@@ -1,86 +1,120 @@
 # Financial Sentiment Lab
 
-Pipeline de analisis de sentimiento financiero que combina noticias y precios
-bursatiles para estudiar relaciones lead-lag entre las noticias y los retornos.
+A financial sentiment analysis pipeline that combines market news and stock
+prices to study lead-lag relationships between news sentiment and returns.
 
-## Arquitectura
+## Architecture
 
 ```mermaid
 flowchart LR
-    Y[yfinance] --> ING[Ingesta]
+    Y[yfinance] --> ING[Ingestion]
     N[NewsAPI] --> ING
-    ING --> NRM[Normalizacion UTC + sesion NYSE]
+    ING --> NRM[UTC normalization + NYSE sessions]
     NRM --> PQ[(Parquet)]
-    PQ --> NLP[Limpieza + FinBERT]
-    NLP --> DS[(Sentimiento diario)]
-    PQ --> AN[Retornos + lead-lag + Granger]
+    PQ --> NLP[Cleaning + FinBERT]
+    NLP --> DS[(Daily sentiment)]
+    PQ --> AN[Returns + lead-lag + Granger]
     DS --> AN
-    AN --> RES[(Resultados)]
+    AN --> RES[(Results)]
     RES --> DASH[Streamlit + Plotly]
 ```
 
-## Estructura
+## Project layout
 
 ```text
 finsent/
-  ingestion/   clientes de noticias y precios
-  storage/     esquemas y persistencia Parquet
-  nlp/         limpieza, FinBERT y agregacion diaria
-  analysis/    alineacion, retornos, lead-lag y Granger
-  pipeline/    orquestadores
-  dashboard/   aplicacion Streamlit
-config/        tickers y parametros
-data/          raw, processed, cache y sample
-tests/         pruebas unitarias y sinteticas
+  ingestion/   news and price clients
+  storage/     schemas and Parquet persistence
+  nlp/         text cleaning, FinBERT, and daily aggregation
+  analysis/    session alignment, returns, lead-lag, and Granger
+  pipeline/    pipeline orchestrators
+  dashboard/   Streamlit application
+config/        ticker and application settings
+data/          raw, processed, cache, and sample data
+tests/         unit and synthetic tests
 ```
 
-## Requisitos
+## Requirements
 
 - Python 3.12
 - [uv](https://docs.astral.sh/uv/)
 
+Install the pipeline dependencies:
+
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
 uv venv --python 3.12
 uv pip install -r requirements-pipeline.txt
 ```
 
-## Uso
+## Usage
+
+Run individual pipeline stages:
 
 ```bash
 uv run python -m finsent ingest
 uv run python -m finsent score
 uv run python -m finsent analyze
+```
+
+Run the incremental pipeline through the latest completed NYSE session:
+
+```bash
 uv run python -m finsent daily
+```
+
+Start the dashboard:
+
+```bash
 uv run streamlit run streamlit_app.py
 ```
 
-`daily` procesa las sesiones NYSE cerradas que falten desde el último checkpoint:
-descarga noticias entre cierres, actualiza precios, puntúa solo artículos nuevos y
-recalcula el análisis. El workflow de GitHub Actions lo ejecuta de lunes a viernes a
-las 22:30 UTC y guarda los Parquet y el checkpoint en el repositorio. La primera
-ejecución descarga el histórico de precios configurado y las noticias del intervalo
-más reciente; las siguientes son incrementales. Configura `NEWSAPI_KEY` como secreto
-del repositorio y permite escritura para GitHub Actions en **Settings → Actions →
-General → Workflow permissions**. Los Parquet se guardan mediante commits, por lo que
-el historial del repositorio crecerá con el tiempo.
+The `daily` command reads the last successfully processed session from
+`data/processed/pipeline_state.json`, fetches news between session closes,
+updates prices, scores only new articles, and recalculates the analysis. It
+catches up on missed sessions after weekends, holidays, or failed runs. On its
+first run, it downloads the configured price lookback and news from the prior
+session close through the latest completed session.
 
-El dashboard lee los Parquet de `data/processed` y muestra el sentimiento y los
-retornos diarios, además de los resultados lead-lag y Granger. Usa **Recargar datos**
-en la barra lateral tras regenerar los resultados. Si faltan tablas, la app indica
-qué etapas del pipeline debes ejecutar.
+## Daily GitHub Actions workflow
 
-## Variables de entorno
+The [daily pipeline workflow](.github/workflows/daily_pipeline.yml) is scheduled
+for weekdays at 22:30 UTC and can also be started manually from the Actions tab.
+It commits processed Parquet files and the session checkpoint back to the
+repository, so repository history grows as data accumulates.
 
-Copia `.env.example` a `.env` y completa las credenciales.
+To enable it:
+
+1. Add `NEWSAPI_KEY` under the repository's **Settings → Secrets and variables
+   → Actions**.
+2. Set **Settings → Actions → General → Workflow permissions** to **Read and
+   write permissions**.
+3. Ensure the workflow is present on the repository's default branch.
+
+GitHub Actions runs on a temporary runner. Committing processed data is how
+this workflow persists results between runs; the dashboard does not fetch those
+results from GitHub automatically.
+
+## Dashboard
+
+The dashboard reads analysis Parquet files from `data/processed` and displays
+daily sentiment, log returns, lead-lag results, and Granger results. Use
+**Reload data** after updating the files. If required tables are missing, the
+app identifies them and tells you which pipeline stages to run.
+
+## Environment variables
+
+Copy `.env.example` to `.env` and add the credentials required for local runs:
 
 ```bash
 cp .env.example .env
 ```
 
-## Estado
+Do not commit `.env` or API keys. For GitHub Actions, configure `NEWSAPI_KEY` as
+a repository secret.
 
-Proyecto centrado exclusivamente en noticias y precios. Las fuentes sociales y los
-formularios regulatorios quedan fuera del alcance. La ingesta de precios y noticias, el
-scoring FinBERT, la agregacion diaria, el analisis de retornos, lead-lag y Granger estan
-implementados y conectados al dashboard.
+## Scope and status
+
+The project currently focuses on news and market prices. Social media and
+regulatory filings are out of scope. News ingestion, FinBERT scoring, daily
+sentiment aggregation, return analysis, lead-lag analysis, Granger tests, and
+the connected dashboard are implemented.

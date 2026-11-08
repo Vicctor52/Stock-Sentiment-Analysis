@@ -13,6 +13,8 @@ from finsent.storage.schemas import (
 
 @dataclass(frozen=True)
 class DashboardData:
+    """Analysis tables loaded for display and the names of missing tables."""
+
     daily_sentiment: pd.DataFrame
     returns: pd.DataFrame
     lead_lag: pd.DataFrame

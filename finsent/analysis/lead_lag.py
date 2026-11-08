@@ -12,6 +12,7 @@ _SUPPORTED_METHODS = {"pearson", "spearman"}
 
 
 def _correlation(x: pd.Series, y: pd.Series, method: str) -> tuple[float, float]:
+    """Calculate a correlation coefficient and p-value for two series."""
     if len(x) < 3 or x.nunique() < 2 or y.nunique() < 2:
         return float("nan"), float("nan")
 

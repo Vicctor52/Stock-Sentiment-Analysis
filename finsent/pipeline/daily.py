@@ -15,6 +15,7 @@ _STATE_FILENAME = "pipeline_state.json"
 
 
 def _session_date(value: object) -> pd.Timestamp:
+    """Convert a calendar session label to a timezone-naive midnight timestamp."""
     timestamp = pd.Timestamp(value)
     if timestamp.tzinfo is not None:
         timestamp = timestamp.tz_convert("UTC").tz_localize(None)
@@ -22,6 +23,7 @@ def _session_date(value: object) -> pd.Timestamp:
 
 
 def _latest_closed_session(calendar, now: pd.Timestamp) -> pd.Timestamp:
+    """Return the latest NYSE session whose close is no later than ``now``."""
     today = now.tz_convert("UTC").tz_localize(None).normalize()
     session = calendar.date_to_session(today, direction="previous")
     if calendar.session_close(session) > now:
@@ -30,6 +32,7 @@ def _latest_closed_session(calendar, now: pd.Timestamp) -> pd.Timestamp:
 
 
 def _read_checkpoint(path: Path) -> pd.Timestamp | None:
+    """Read the last successfully processed session, if a checkpoint exists."""
     if not path.exists():
         return None
 
@@ -40,6 +43,7 @@ def _read_checkpoint(path: Path) -> pd.Timestamp | None:
 
 
 def _write_checkpoint(path: Path, session: pd.Timestamp) -> None:
+    """Atomically persist the last successfully processed session."""
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = path.with_suffix(".tmp")
     temporary_path.write_text(
