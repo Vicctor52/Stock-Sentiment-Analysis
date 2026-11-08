@@ -8,7 +8,7 @@ logger = __import__("logging").getLogger(__name__)
 
 
 def run_ingestion() -> None:
-    """Run the ingestion stage for prices, news, and Reddit data.
+    """Run the ingestion stage for prices and news.
 
     This step currently only handles price ingestion:
     1. Loads pipeline settings and ticker list.

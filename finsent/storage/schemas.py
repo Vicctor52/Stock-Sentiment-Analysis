@@ -1,38 +1,12 @@
-REDDIT_POSTS_COLUMNS = [
-    "post_id",
-    "subreddit",
-    "author_hash",
-    "created_utc",
-    "title",
-    "selftext",
-    "url",
-    "score",
-    "num_comments",
-    "tickers",
-    "ingested_at",
-]
-
-REDDIT_COMMENTS_COLUMNS = [
-    "comment_id",
-    "post_id",
-    "parent_id",
-    "author_hash",
-    "created_utc",
-    "body",
-    "score",
-    "tickers",
-    "ingested_at",
-]
-
 NEWS_ARTICLES_COLUMNS = [
     "article_id",
+    "ticker",
     "source_name",
     "published_utc",
     "title",
     "description",
     "content",
     "url",
-    "tickers",
     "ingested_at",
 ]
 
@@ -76,7 +50,6 @@ DAILY_SENTIMENT_COLUMNS = [
     "n_docs",
     "sentiment_index",
     "sentiment_expected",
-    "engagement_weighted_index",
 ]
 
 RETURNS_COLUMNS = [

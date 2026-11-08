@@ -10,7 +10,6 @@ model:
 ingestion:
   price_period: 12mo
   price_interval: 1d
-  reddit_comment_limit: 50
   news_page_size: 100
 
 analysis:

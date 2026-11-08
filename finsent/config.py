@@ -16,7 +16,6 @@ class ModelConfig(BaseModel):
 class IngestionConfig(BaseModel):
     price_period: str
     price_interval: str
-    reddit_comment_limit: int
     news_page_size: int
 
 
@@ -69,7 +68,7 @@ def load_settings(path: str = "config/settings.yaml") -> Settings:
 
 
 def load_tickers(path: str = "config/tickers.yaml") -> dict[str, list[str]]:
-    """Load ticker and subreddit configuration from a YAML file.
+    """Load ticker configuration from a YAML file.
 
     Args:
         path: Path to the ticker configuration file.

@@ -1,7 +1,7 @@
 # Financial Sentiment Lab
 
-Pipeline de analisis de sentimiento financiero que combina Reddit, noticias y precios
-bursatiles para estudiar relaciones lead-lag entre la conversacion social y los retornos.
+Pipeline de analisis de sentimiento financiero que combina noticias y precios
+bursatiles para estudiar relaciones lead-lag entre las noticias y los retornos.
 
 ## Arquitectura
 
@@ -9,7 +9,6 @@ bursatiles para estudiar relaciones lead-lag entre la conversacion social y los 
 flowchart LR
     Y[yfinance] --> ING[Ingesta]
     N[NewsAPI] --> ING
-    R[PRAW / Reddit] --> ING
     ING --> NRM[Normalizacion UTC + sesion NYSE]
     NRM --> PQ[(Parquet)]
     PQ --> NLP[Limpieza + FinBERT]
@@ -24,7 +23,7 @@ flowchart LR
 
 ```text
 finsent/
-  ingestion/   clientes de Reddit, noticias y precios
+  ingestion/   clientes de noticias y precios
   storage/     esquemas y persistencia Parquet
   nlp/         limpieza, FinBERT y agregacion diaria
   analysis/    alineacion, retornos, lead-lag y Granger
@@ -65,5 +64,7 @@ cp .env.example .env
 
 ## Estado
 
-Estructura inicial del proyecto. Las fases de ingesta, NLP, analisis y dashboard se
-implementan de forma incremental.
+Proyecto centrado exclusivamente en noticias y precios. Las fuentes sociales y los
+formularios regulatorios quedan fuera del alcance. La ingesta de precios esta
+implementada; la ingesta de noticias, NLP, analisis y dashboard se completan de forma
+incremental.
