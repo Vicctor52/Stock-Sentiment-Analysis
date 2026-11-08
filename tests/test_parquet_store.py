@@ -4,7 +4,12 @@ import pandas as pd
 import pytest
 
 from finsent.storage.parquet_store import ParquetStore
-from finsent.storage.schemas import NEWS_ARTICLES_COLUMNS, PRICES_COLUMNS
+from finsent.storage.schemas import (
+    DAILY_SENTIMENT_COLUMNS,
+    NEWS_ARTICLES_COLUMNS,
+    PRICES_COLUMNS,
+    SENTIMENT_COLUMNS,
+)
 
 
 @pytest.fixture
@@ -50,6 +55,29 @@ def news_df():
                 "https://example.com/nvda",
             ],
             "ingested_at": pd.to_datetime(["2024-01-02T22:00:00Z"] * 3),
+        }
+    )
+
+
+@pytest.fixture
+def sentiment_df():
+    """Sample DataFrame matching SENTIMENT_COLUMNS."""
+    return pd.DataFrame(
+        {
+            "doc_id": ["a1", "a2"],
+            "doc_type": ["news", "news"],
+            "ticker": ["NVDA", "AAPL"],
+            "published_utc": pd.to_datetime(["2024-01-02T21:30:00Z", "2024-01-02T21:30:00Z"]),
+            "session_date": pd.to_datetime(["2024-01-02", "2024-01-02"]),
+            "text_hash": ["h1", "h2"],
+            "model_name": ["ProsusAI/finbert", "ProsusAI/finbert"],
+            "model_revision": ["main", "main"],
+            "label": ["positive", "negative"],
+            "p_pos": [0.8, 0.1],
+            "p_neg": [0.1, 0.8],
+            "p_neu": [0.1, 0.1],
+            "score": [0.7, -0.7],
+            "scored_at": pd.to_datetime(["2024-01-02T22:00:00Z", "2024-01-02T22:00:00Z"]),
         }
     )
 
@@ -198,3 +226,70 @@ class TestParquetStore:
         store.write("news", frame)
 
         assert list(frame.columns) == ["article_id", "ticker"]
+
+    def test_write_and_read_news_sentiment(self, sentiment_df):
+        """News sentiment should use the document-level schema."""
+        root = _tmp_dir()
+        store = ParquetStore(root=root)
+
+        store.write("news_sentiment", sentiment_df)
+        rows = store.read("news_sentiment")
+
+        assert list(rows.columns) == SENTIMENT_COLUMNS
+        assert len(rows) == 2
+        assert rows["label"].tolist() == ["positive", "negative"]
+
+    def test_primary_keys_sentiment_tables(self):
+        """Sentiment tables should define their deduplication keys."""
+        root = _tmp_dir()
+        store = ParquetStore(root=root)
+
+        assert store._primary_keys("news_sentiment") == ["doc_id", "ticker"]
+        assert store._primary_keys("daily_sentiment") == [
+            "ticker",
+            "session_date",
+            "source",
+        ]
+
+    def test_write_daily_sentiment(self):
+        """Daily sentiment should use the aggregate schema."""
+        root = _tmp_dir()
+        store = ParquetStore(root=root)
+        daily = pd.DataFrame(
+            {
+                "ticker": ["NVDA"],
+                "session_date": pd.to_datetime(["2024-01-02"]),
+                "source": ["news"],
+                "n_pos": [2],
+                "n_neg": [1],
+                "n_neu": [1],
+                "n_docs": [4],
+                "sentiment_index": [0.25],
+                "sentiment_expected": [0.2],
+            }
+        )
+
+        store.write("daily_sentiment", daily)
+        rows = store.read("daily_sentiment")
+
+        assert list(rows.columns) == DAILY_SENTIMENT_COLUMNS
+        assert len(rows) == 1
+
+    def test_write_overwrite_replaces_table(self, news_df):
+        """overwrite=True should replace the existing table."""
+        root = _tmp_dir()
+        store = ParquetStore(root=root)
+        store.write("news", news_df)
+
+        replacement = pd.DataFrame(
+            {
+                "article_id": ["new"],
+                "ticker": ["TSLA"],
+                "title": ["New article"],
+            }
+        )
+        store.write("news", replacement, overwrite=True)
+
+        rows = store.read("news")
+        assert len(rows) == 1
+        assert rows["article_id"].tolist() == ["new"]

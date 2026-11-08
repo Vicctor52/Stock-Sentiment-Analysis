@@ -3,7 +3,12 @@ from pathlib import Path
 import pandas as pd
 
 from finsent.logging import get_logger
-from finsent.storage.schemas import NEWS_ARTICLES_COLUMNS, PRICES_COLUMNS
+from finsent.storage.schemas import (
+    DAILY_SENTIMENT_COLUMNS,
+    NEWS_ARTICLES_COLUMNS,
+    PRICES_COLUMNS,
+    SENTIMENT_COLUMNS,
+)
 
 logger = get_logger(__name__)
 
@@ -11,12 +16,16 @@ logger = get_logger(__name__)
 TABLE_COLUMNS = {
     "prices": PRICES_COLUMNS,
     "news": NEWS_ARTICLES_COLUMNS,
+    "news_sentiment": SENTIMENT_COLUMNS,
+    "daily_sentiment": DAILY_SENTIMENT_COLUMNS,
 }
 
 # Mapping of table names to their primary key column(s) for deduplication.
 TABLE_PRIMARY_KEYS = {
     "prices": ["ticker", "session_date"],
     "news": ["article_id", "ticker"],
+    "news_sentiment": ["doc_id", "ticker"],
+    "daily_sentiment": ["ticker", "session_date", "source"],
 }
 
 
@@ -78,12 +87,18 @@ class ParquetStore:
             raise KeyError(f"Unknown table '{table}'; no primary keys defined.")
         return keys
 
-    def write(self, table: str, frame: pd.DataFrame) -> None:
+    def write(
+        self,
+        table: str,
+        frame: pd.DataFrame,
+        overwrite: bool = False,
+    ) -> None:
         """Write *frame* to a named Parquet table, deduplicating by primary key.
 
-        If the table file already exists, the new data is concatenated with the
-        existing data and duplicates (according to the table's primary key) are
-        removed, keeping the *last* occurrence.
+        If the table file already exists and ``overwrite`` is false, the new
+        data is concatenated with the existing data and duplicates (according
+        to the table's primary key) are removed, keeping the *last* occurrence.
+        If ``overwrite`` is true, the existing table is replaced.
 
         Parameters
         ----------
@@ -91,6 +106,8 @@ class ParquetStore:
             Name of the table (e.g. ``"prices"`` or ``"news"``).
         frame : pd.DataFrame
             Data to persist. Missing schema columns are filled with ``NaN``.
+        overwrite : bool
+            Whether to replace the existing table instead of merging into it.
         """
         columns = self._columns(table)
         keys = self._primary_keys(table)
@@ -102,7 +119,7 @@ class ParquetStore:
                 new_data[col] = pd.NA
         new_data = new_data.reindex(columns=columns)
 
-        if path.exists():
+        if path.exists() and not overwrite:
             existing = pd.read_parquet(path)
             for col in columns:
                 if col not in existing.columns:

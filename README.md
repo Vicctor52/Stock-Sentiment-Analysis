@@ -65,5 +65,6 @@ cp .env.example .env
 ## Estado
 
 Proyecto centrado exclusivamente en noticias y precios. Las fuentes sociales y los
-formularios regulatorios quedan fuera del alcance. La ingesta de precios y noticias esta
-implementada; NLP, analisis y dashboard se completan de forma incremental.
+formularios regulatorios quedan fuera del alcance. La ingesta de precios y noticias, el
+scoring FinBERT y la agregacion diaria estan implementados; retornos, lead-lag, Granger y
+dashboard se completan de forma incremental.

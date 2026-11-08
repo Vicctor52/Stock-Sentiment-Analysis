@@ -1,13 +1,34 @@
-def clean_text(text: str) -> str:
+import hashlib
+import html
+import re
+
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+_URL_RE = re.compile(r"https?://\S+|www\.\S+")
+_TRUNCATION_RE = re.compile(r"\[\+\d+ chars\]")
+_WHITESPACE_RE = re.compile(r"\s+")
+_ELLIPSIS_RE = re.compile(r"…")
+
+
+def clean_text(text: str | None) -> str:
     """Normalize raw text for sentiment scoring.
 
     Args:
         text: Raw text to clean.
 
     Returns:
-        The cleaned text.
+        The cleaned text with HTML, URLs, NewsAPI truncation markers, and
+        repeated whitespace removed.
     """
-    raise NotImplementedError
+    if not isinstance(text, str):
+        return ""
+
+    cleaned = html.unescape(text)
+    cleaned = _HTML_TAG_RE.sub(" ", cleaned)
+    cleaned = _URL_RE.sub(" ", cleaned)
+    cleaned = _TRUNCATION_RE.sub(" ", cleaned)
+    cleaned = _ELLIPSIS_RE.sub(" ", cleaned)
+    cleaned = _WHITESPACE_RE.sub(" ", cleaned)
+    return cleaned.strip()
 
 
 def extract_tickers(text: str, universe: set[str]) -> list[str]:
@@ -32,4 +53,4 @@ def text_hash(text: str) -> str:
     Returns:
         A hexadecimal hash digest.
     """
-    raise NotImplementedError
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
