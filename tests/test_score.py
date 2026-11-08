@@ -146,6 +146,43 @@ def test_run_scoring_replaces_previous_sentiment(monkeypatch, tmp_path):
     assert len(sentiment) == 3
 
 
+def test_run_scoring_scores_only_new_articles(monkeypatch, tmp_path):
+    class _TrackingFinBert(_FakeFinBert):
+        scored_texts = []
+
+        def score(self, texts):
+            self.scored_texts.extend(texts)
+            return super().score(texts)
+
+    store = ParquetStore(root=tmp_path)
+    store.write("news", _news_frame(), overwrite=True)
+    monkeypatch.setattr(score, "load_settings", lambda: _settings(tmp_path))
+    monkeypatch.setattr(score, "FinBertScorer", _TrackingFinBert)
+
+    score.run_scoring()
+    _TrackingFinBert.scored_texts.clear()
+    store.write(
+        "news",
+        pd.DataFrame(
+            {
+                "article_id": ["a5"],
+                "ticker": ["AMZN"],
+                "published_utc": pd.to_datetime(["2024-01-03T15:00:00Z"], utc=True),
+                "title": ["Amazon beats expectations"],
+                "description": ["Strong results"],
+                "content": [""],
+            }
+        ),
+    )
+
+    score.run_scoring()
+
+    assert len(_TrackingFinBert.scored_texts) == 1
+    sentiment = ParquetStore(root=tmp_path).read("news_sentiment")
+    assert len(sentiment) == 4
+    assert "a5" in set(sentiment["doc_id"])
+
+
 def test_run_scoring_requires_news_file(monkeypatch, tmp_path):
     monkeypatch.setattr(score, "load_settings", lambda: _settings(tmp_path))
 

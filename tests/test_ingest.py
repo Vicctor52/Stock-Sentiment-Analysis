@@ -25,6 +25,7 @@ class FakeStore:
 
 def _settings() -> SimpleNamespace:
     return SimpleNamespace(
+        storage=SimpleNamespace(processed_dir="data/processed"),
         ingestion=SimpleNamespace(
             price_period="12mo",
             price_interval="1d",

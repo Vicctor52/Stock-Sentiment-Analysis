@@ -2,6 +2,7 @@ import typer
 from dotenv import load_dotenv
 
 from finsent.pipeline.analyze import run_analysis
+from finsent.pipeline.daily import run_daily_pipeline
 from finsent.pipeline.ingest import run_ingestion
 from finsent.pipeline.score import run_scoring
 
@@ -26,6 +27,12 @@ def score() -> None:
 def analyze() -> None:
     """Run the analysis stage."""
     run_analysis()
+
+
+@app.command()
+def daily() -> None:
+    """Run the incremental pipeline through the latest completed market session."""
+    run_daily_pipeline()
 
 
 if __name__ == "__main__":

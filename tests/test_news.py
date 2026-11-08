@@ -81,6 +81,49 @@ def test_fetch_news_continues_after_ticker_error(
     assert result["ticker"].unique().tolist() == ["NVDA"]
 
 
+def test_fetch_news_paginates_and_applies_date_range(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = []
+
+    class PaginatedNewsApiClient:
+        def __init__(self, api_key: str) -> None:
+            pass
+
+        def get_everything(self, **kwargs):
+            calls.append(kwargs)
+            article_number = len(calls)
+            articles = [
+                {
+                    "publishedAt": f"2024-01-0{article_number}T15:00:00Z",
+                    "title": f"Headline {article_number}",
+                    "url": f"https://example.com/{article_number}",
+                }
+            ]
+            return {"articles": articles, "totalResults": 2}
+
+    monkeypatch.setenv("NEWSAPI_KEY", "test-key")
+    monkeypatch.setattr("newsapi.NewsApiClient", PaginatedNewsApiClient)
+
+    result = news.fetch_news(
+        ["NVDA"],
+        page_size=1,
+        from_date="2024-01-01T21:00:00+00:00",
+        to_date="2024-01-02T21:00:00+00:00",
+    )
+
+    assert len(result) == 2
+    assert [call["page"] for call in calls] == [1, 2]
+    assert all(call["from_param"] == "2024-01-01T21:00:00+00:00" for call in calls)
+    assert all(call["to"] == "2024-01-02T21:00:00+00:00" for call in calls)
+
+
+def test_fetch_news_strict_raises_on_ticker_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NEWSAPI_KEY", "test-key")
+    monkeypatch.setattr("newsapi.NewsApiClient", FakeNewsApiClient)
+
+    with pytest.raises(RuntimeError, match="Failed to fetch news for BAD"):
+        news.fetch_news(["BAD"], strict=True)
+
+
 def test_fetch_news_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("NEWSAPI_KEY", raising=False)
 

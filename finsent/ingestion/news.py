@@ -44,6 +44,7 @@ def fetch_news(
     from_date: str | None = None,
     to_date: str | None = None,
     use_yfinance: bool = False,
+    strict: bool = False,
 ) -> pd.DataFrame:
     """Fetch recent news articles for each ticker.
 
@@ -54,6 +55,8 @@ def fetch_news(
         to_date: Optional ISO date upper bound accepted by NewsAPI.
         use_yfinance: If ``True``, fall back to ``yfinance`` news when
             ``NEWSAPI_KEY`` is not set or to supplement the NewsAPI results.
+        strict: Re-raise ticker-level errors so scheduled runs do not mark a
+            partially collected interval as complete.
 
     Returns:
         A normalized DataFrame with one row per article and ticker. Columns:
@@ -91,32 +94,44 @@ def fetch_news(
                 query_kwargs["to"] = to_date
 
             try:
-                response = newsapi.get_everything(**query_kwargs)
+                page = 1
+                while True:
+                    response = newsapi.get_everything(**query_kwargs, page=page)
+                    articles = response.get("articles", [])
+                    for article in articles:
+                        url = article.get("url") or ""
+                        title = article.get("title") or ""
+                        published_at = article.get("publishedAt")
+                        if not url and not title:
+                            continue
+
+                        raw_id = url or f"{title}|{published_at}"
+                        rows.append(
+                            {
+                                "article_id": hashlib.sha256(raw_id.encode("utf-8")).hexdigest(),
+                                "ticker": ticker,
+                                "source_name": (article.get("source") or {}).get("name"),
+                                "published_utc": pd.to_datetime(
+                                    published_at, utc=True, errors="coerce"
+                                ),
+                                "title": title,
+                                "description": article.get("description"),
+                                "content": article.get("content"),
+                                "url": url,
+                                "ingested_at": pd.Timestamp.now(tz="UTC"),
+                            }
+                        )
+
+                    total_results = response.get("totalResults")
+                    if len(articles) < min(page_size, 100) or (
+                        total_results is not None and page * min(page_size, 100) >= total_results
+                    ):
+                        break
+                    page += 1
             except Exception as exc:
                 logger.error("Error fetching news for %s from NewsAPI: %s", ticker, exc)
-                continue
-
-            for article in response.get("articles", []):
-                url = article.get("url") or ""
-                title = article.get("title") or ""
-                published_at = article.get("publishedAt")
-                if not url and not title:
-                    continue
-
-                raw_id = url or f"{title}|{published_at}"
-                rows.append(
-                    {
-                        "article_id": hashlib.sha256(raw_id.encode("utf-8")).hexdigest(),
-                        "ticker": ticker,
-                        "source_name": (article.get("source") or {}).get("name"),
-                        "published_utc": pd.to_datetime(published_at, utc=True, errors="coerce"),
-                        "title": title,
-                        "description": article.get("description"),
-                        "content": article.get("content"),
-                        "url": url,
-                        "ingested_at": pd.Timestamp.now(tz="UTC"),
-                    }
-                )
+                if strict:
+                    raise RuntimeError(f"Failed to fetch news for {ticker}") from exc
 
         frame = pd.DataFrame(rows, columns=NEWS_ARTICLES_COLUMNS)
         if not frame.empty:

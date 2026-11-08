@@ -50,6 +50,25 @@ def test_fetch_prices_normalizes_and_sorts(monkeypatch: pytest.MonkeyPatch) -> N
     assert result["adj_close"].tolist() == [104.0] * 6
 
 
+def test_fetch_prices_uses_explicit_date_range(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = []
+
+    def fake_download(ticker, period, interval, start=None, end=None):
+        calls.append((ticker, start, end))
+        return _fake_history(periods=1)
+
+    monkeypatch.setattr(prices, "_download_ticker", fake_download)
+
+    prices.fetch_prices(["NVDA"], start="2024-01-03", end="2024-01-05", strict=True)
+
+    assert calls == [("NVDA", "2024-01-03", "2024-01-05")]
+
+
+def test_fetch_prices_requires_both_date_bounds() -> None:
+    with pytest.raises(ValueError, match="Both start and end"):
+        prices.fetch_prices(["NVDA"], start="2024-01-03")
+
+
 def test_fetch_prices_continues_after_ticker_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

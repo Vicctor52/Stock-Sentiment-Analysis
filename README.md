@@ -51,8 +51,19 @@ uv pip install -r requirements-pipeline.txt
 uv run python -m finsent ingest
 uv run python -m finsent score
 uv run python -m finsent analyze
+uv run python -m finsent daily
 uv run streamlit run streamlit_app.py
 ```
+
+`daily` procesa las sesiones NYSE cerradas que falten desde el último checkpoint:
+descarga noticias entre cierres, actualiza precios, puntúa solo artículos nuevos y
+recalcula el análisis. El workflow de GitHub Actions lo ejecuta de lunes a viernes a
+las 22:30 UTC y guarda los Parquet y el checkpoint en el repositorio. La primera
+ejecución descarga el histórico de precios configurado y las noticias del intervalo
+más reciente; las siguientes son incrementales. Configura `NEWSAPI_KEY` como secreto
+del repositorio y permite escritura para GitHub Actions en **Settings → Actions →
+General → Workflow permissions**. Los Parquet se guardan mediante commits, por lo que
+el historial del repositorio crecerá con el tiempo.
 
 El dashboard lee los Parquet de `data/processed` y muestra el sentimiento y los
 retornos diarios, además de los resultados lead-lag y Granger. Usa **Recargar datos**

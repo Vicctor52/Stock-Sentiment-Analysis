@@ -40,13 +40,22 @@ class PriceFetchError(RuntimeError):
     wait=wait_exponential(multiplier=1, min=1, max=10),
     reraise=True,
 )
-def _download_ticker(ticker: str, period: str, interval: str) -> pd.DataFrame:
+def _download_ticker(
+    ticker: str,
+    period: str,
+    interval: str,
+    start: str | None = None,
+    end: str | None = None,
+) -> pd.DataFrame:
     """Download historical prices for a single ticker.
 
     Args:
         ticker: Ticker symbol to query.
         period: Lookback period accepted by yfinance, such as ``"12mo"``.
         interval: Bar interval accepted by yfinance, such as ``"1d"``.
+        start: Optional inclusive start date. When provided, date bounds are
+            used instead of ``period``.
+        end: Optional exclusive end date.
 
     Returns:
         Raw price history returned by yfinance.
@@ -54,11 +63,8 @@ def _download_ticker(ticker: str, period: str, interval: str) -> pd.DataFrame:
     Raises:
         Exception: Re-raised after the configured retry attempts are exhausted.
     """
-    return yf.Ticker(ticker).history(
-        period=period,
-        interval=interval,
-        auto_adjust=False,
-    )
+    date_range = {"start": start, "end": end} if start is not None else {"period": period}
+    return yf.Ticker(ticker).history(interval=interval, auto_adjust=False, **date_range)
 
 
 # Change in case of wanting to implement different timezones data for the prices
@@ -77,7 +83,13 @@ def _normalize_session_dates(values: pd.Series) -> pd.Series:
     return dates.dt.normalize()
 
 
-def _fetch_single_ticker(ticker: str, period: str, interval: str) -> pd.DataFrame:
+def _fetch_single_ticker(
+    ticker: str,
+    period: str,
+    interval: str,
+    start: str | None = None,
+    end: str | None = None,
+) -> pd.DataFrame:
     """Fetch and normalize price history for one ticker.
 
     Args:
@@ -93,7 +105,10 @@ def _fetch_single_ticker(ticker: str, period: str, interval: str) -> pd.DataFram
             required columns or valid close prices.
     """
     try:
-        raw = _download_ticker(ticker, period, interval)
+        if start is None:
+            raw = _download_ticker(ticker, period, interval)
+        else:
+            raw = _download_ticker(ticker, period, interval, start=start, end=end)
     except Exception as exc:
         raise PriceFetchError(f"Failed to download prices for {ticker}: {exc}") from exc
 
@@ -156,6 +171,9 @@ def fetch_prices(
     tickers: list[str],
     period: str = "12mo",
     interval: str = "1d",
+    start: str | None = None,
+    end: str | None = None,
+    strict: bool = False,
 ) -> pd.DataFrame:
     """Fetch, normalize, deduplicate, and validate prices for multiple tickers.
 
@@ -163,6 +181,11 @@ def fetch_prices(
         tickers: Ticker symbols to fetch.
         period: Lookback period accepted by yfinance.
         interval: Bar interval accepted by yfinance.
+        start: Optional inclusive start date; use with ``end`` for incremental
+            downloads. ``end`` is exclusive, matching yfinance.
+        end: Optional exclusive end date.
+        strict: Raise if any ticker download fails instead of returning partial
+            results.
 
     Returns:
         A concatenated frame with the columns defined in ``PRICES_COLUMNS``,
@@ -172,6 +195,8 @@ def fetch_prices(
         ValueError: If ``tickers`` is empty.
         PriceFetchError: If every ticker fails to return valid data.
     """
+    if (start is None) != (end is None):
+        raise ValueError("Both start and end dates are required for a date range.")
     if not tickers:
         raise ValueError("At least one ticker is required")
 
@@ -181,7 +206,7 @@ def fetch_prices(
 
     for ticker in tickers:
         try:
-            frame = _fetch_single_ticker(ticker, period, interval)
+            frame = _fetch_single_ticker(ticker, period, interval, start, end)
         except PriceFetchError as exc:
             failures.append(ticker)
             logger.warning("%s", exc)
@@ -195,6 +220,8 @@ def fetch_prices(
         frames.append(frame)
         logger.info("Fetched %d rows for %s", len(frame), ticker)
 
+    if strict and failures:
+        raise PriceFetchError(f"Price data unavailable for tickers: {', '.join(failures)}")
     if not frames:
         raise PriceFetchError(f"No price data fetched for any ticker: {', '.join(tickers)}")
 

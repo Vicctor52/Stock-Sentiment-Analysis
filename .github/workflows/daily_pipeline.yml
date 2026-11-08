@@ -1,7 +1,16 @@
 name: daily-pipeline
 
 on:
+  schedule:
+    - cron: "30 22 * * 1-5"
   workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-pipeline
+  cancel-in-progress: false
 
 jobs:
   pipeline:
@@ -17,8 +26,22 @@ jobs:
           path: ~/.cache/huggingface
           key: hf-${{ hashFiles('requirements-pipeline.txt') }}
       - run: uv pip install -r requirements-pipeline.txt
-      - run: uv run python -m finsent ingest
+      - name: Require NewsAPI credentials
+        run: test -n "$NEWSAPI_KEY"
         env:
           NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
-      - run: uv run python -m finsent score
-      - run: uv run python -m finsent analyze
+      - run: uv run python -m finsent daily
+        env:
+          NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+      - name: Persist processed data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f data/processed/*.parquet data/processed/pipeline_state.json
+          if git diff --cached --quiet; then
+            echo "No processed data changes to commit."
+          else
+            git commit -m "chore(data): update daily pipeline data" \
+              -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+            git push
+          fi
