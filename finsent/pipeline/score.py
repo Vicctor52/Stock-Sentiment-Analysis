@@ -77,9 +77,7 @@ def run_scoring() -> None:
         )
         missing_sessions = int(news["session_date"].isna().sum())
         if missing_sessions:
-            logger.warning(
-                "Dropping %d articles without a valid session date.", missing_sessions
-            )
+            logger.warning("Dropping %d articles without a valid session date.", missing_sessions)
             news = news.dropna(subset=["session_date"])
 
     try:
@@ -97,8 +95,7 @@ def run_scoring() -> None:
     existing_texts = set(zip(existing["ticker"], existing["text_hash"], strict=False))
     new_news = news.loc[
         [
-            (article_id, ticker) not in existing_keys
-            and (ticker, digest) not in existing_texts
+            (article_id, ticker) not in existing_keys and (ticker, digest) not in existing_texts
             for article_id, ticker, digest in zip(
                 news["article_id"], news["ticker"], news["text_hash"], strict=False
             )
@@ -115,9 +112,7 @@ def run_scoring() -> None:
         )
         scores = scorer.score(new_news["text"].tolist())
         if len(scores) != len(new_news):
-            raise RuntimeError(
-                f"FinBERT returned {len(scores)} scores for {len(new_news)} texts."
-            )
+            raise RuntimeError(f"FinBERT returned {len(scores)} scores for {len(new_news)} texts.")
 
         scored_at = pd.Timestamp.now(tz="UTC")
         row_count = len(new_news)

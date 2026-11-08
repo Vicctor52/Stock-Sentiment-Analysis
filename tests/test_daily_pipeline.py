@@ -79,8 +79,8 @@ def test_daily_pipeline_catches_up_after_weekend(monkeypatch, tmp_path):
     assert calls[0]["news_to"] == "2024-01-08T21:00:00+00:00"
     assert calls[0]["price_start"] == "2024-01-06"
     assert calls[0]["price_end"] == "2024-01-09"
-    assert (tmp_path / "pipeline_state.json").read_text(encoding="utf-8").endswith(
-        '"2024-01-08"\n}\n'
+    assert (
+        (tmp_path / "pipeline_state.json").read_text(encoding="utf-8").endswith('"2024-01-08"\n}\n')
     )
 
 

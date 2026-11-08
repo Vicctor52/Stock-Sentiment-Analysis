@@ -54,9 +54,7 @@ def main() -> None:
             latest_sentiment = sentiment.loc[
                 sentiment["session_date"] == latest_date, "sentiment_index"
             ].mean()
-            total_articles = (
-                int(sentiment["n_docs"].sum()) if "n_docs" in sentiment.columns else 0
-            )
+            total_articles = int(sentiment["n_docs"].sum()) if "n_docs" in sentiment.columns else 0
             st.metric("Artículos analizados", f"{total_articles:,}")
             st.metric("Sentimiento más reciente", f"{latest_sentiment:.3f}")
             st.caption(f"Última sesión con sentimiento: {latest_date:%Y-%m-%d}")

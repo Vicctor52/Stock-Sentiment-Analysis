@@ -30,7 +30,7 @@ def _settings() -> SimpleNamespace:
             price_period="12mo",
             price_interval="1d",
             news_page_size=50,
-        )
+        ),
     )
 
 
