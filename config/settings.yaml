@@ -14,8 +14,8 @@ ingestion:
 
 analysis:
   lags: [0, 1, 2]
-  min_observations: 60
-  max_granger_lag: 5
+  min_observations: 5
+  max_granger_lag: 2
   fdr_alpha: 0.05
 
 storage:

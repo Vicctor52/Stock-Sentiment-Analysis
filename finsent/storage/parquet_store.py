@@ -5,8 +5,11 @@ import pandas as pd
 from finsent.logging import get_logger
 from finsent.storage.schemas import (
     DAILY_SENTIMENT_COLUMNS,
+    GRANGER_COLUMNS,
+    LEAD_LAG_COLUMNS,
     NEWS_ARTICLES_COLUMNS,
     PRICES_COLUMNS,
+    RETURNS_COLUMNS,
     SENTIMENT_COLUMNS,
 )
 
@@ -18,6 +21,9 @@ TABLE_COLUMNS = {
     "news": NEWS_ARTICLES_COLUMNS,
     "news_sentiment": SENTIMENT_COLUMNS,
     "daily_sentiment": DAILY_SENTIMENT_COLUMNS,
+    "returns": RETURNS_COLUMNS,
+    "lead_lag": LEAD_LAG_COLUMNS,
+    "granger": GRANGER_COLUMNS,
 }
 
 # Mapping of table names to their primary key column(s) for deduplication.
@@ -26,6 +32,9 @@ TABLE_PRIMARY_KEYS = {
     "news": ["article_id", "ticker"],
     "news_sentiment": ["doc_id", "ticker"],
     "daily_sentiment": ["ticker", "session_date", "source"],
+    "returns": ["ticker", "session_date"],
+    "lead_lag": ["ticker", "source", "method", "lag"],
+    "granger": ["ticker", "source", "maxlag", "lag", "test"],
 }
 
 
