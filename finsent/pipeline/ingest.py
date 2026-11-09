@@ -24,8 +24,9 @@ def run_ingestion(
     4. Fetches recent news for each ticker.
     5. Persists news to ``data/processed/news.parquet``.
 
-    News ingestion is skipped when ``CURRENTS_API_KEY`` is not configured. Both
-    tables are deduplicated by their primary keys via ``ParquetStore``.
+    News ingestion is skipped when the API key for the configured provider is
+    not available. Both tables are deduplicated by their primary keys via
+    ``ParquetStore``.
     """
     settings = load_settings()
     tickers_config = load_tickers()
@@ -64,11 +65,24 @@ def run_ingestion(
     logger.info("Price ingestion complete. %d rows saved.", len(prices))
 
     try:
-        news_kwargs = {
-            "page_size": settings.ingestion.news_page_size,
-            "chunk_days": settings.ingestion.news_chunk_days,
-            "max_pages": settings.ingestion.news_max_pages,
-        }
+        provider = settings.ingestion.news_provider
+        news_kwargs: dict[str, object]
+        if provider == "gnews":
+            news_kwargs = {
+                "provider": "gnews",
+                "gnews_max_articles": settings.ingestion.gnews_max_articles,
+                "gnews_chunk_days": settings.ingestion.gnews_chunk_days,
+                "gnews_max_pages": settings.ingestion.gnews_max_pages,
+                "gnews_language": settings.ingestion.gnews_language,
+                "gnews_country": settings.ingestion.gnews_country,
+            }
+        else:
+            news_kwargs = {
+                "provider": "currents",
+                "page_size": settings.ingestion.news_page_size,
+                "chunk_days": settings.ingestion.news_chunk_days,
+                "max_pages": settings.ingestion.news_max_pages,
+            }
         if strict or news_from is not None:
             news = fetch_news(
                 tickers,

@@ -8,7 +8,7 @@ prices to study lead-lag relationships between news sentiment and returns.
 ```mermaid
 flowchart LR
     Y[yfinance] --> ING[Ingestion]
-    N[Currents API] --> ING
+    N[Currents or GNews API] --> ING
     ING --> NRM[UTC normalization + NYSE sessions]
     NRM --> PQ[(Parquet)]
     PQ --> NLP[Cleaning + FinBERT]
@@ -83,16 +83,27 @@ exactly at the closing bell belong to the next session. Tune
 `ingestion.bootstrap_days` and `ingestion.news_overlap_sessions` in
 `config/settings.yaml` if needed.
 
-News ingestion uses the Currents API. Its free plan caps each search at 7
-calendar days and 20 results, so the ingestion layer splits date ranges into
-7-day windows and fetches up to `ingestion.news_max_pages` pages (3 by default)
-per ticker and window. The 20-day bootstrap needs about 60 base requests and up
-to 180 with pagination, below the free daily quota of 250.
+News ingestion uses the Currents API by default and can switch to GNews by
+setting `ingestion.news_provider` to `gnews` in `config/settings.yaml`.
+
+The Currents free plan caps each search at 7 calendar days and 20 results, so
+the ingestion layer splits date ranges into 7-day windows and fetches up to
+`ingestion.news_max_pages` pages (3 by default) per ticker and window. The
+20-day bootstrap needs about 60 base requests and up to 180 with pagination,
+below the free daily quota of 250.
+
+The GNews provider reads its own `gnews_*` settings: 7-day windows by default,
+`gnews_max_articles` per request (10), and `gnews_max_pages` pages (1) per ticker
+and window. The GNews free plan allows 100 requests per day, 10 articles per
+request, and at most 30 days of history. It also limits the `to` parameter to at
+least 12 hours ago, so a free-plan run at 22:30 UTC may not return the latest
+session's articles. Use a paid GNews plan or keep Currents for real-time daily
+runs.
 
 Every later run re-fetches `news_overlap_sessions` (default 2) already processed
 sessions before the checkpoint. Duplicate articles and sentiment rows are
 discarded by the Parquet primary keys, so the overlap only recovers items that a
-delayed Currents API response did not return on the previous run.
+delayed provider response did not return on the previous run.
 
 ## First local bootstrap and GitHub Actions handoff
 
@@ -128,8 +139,9 @@ pipeline, it verifies that the local bootstrap data and checkpoint are present.
 
 To enable it:
 
-1. Add `CURRENTS_API_KEY` under the repository's **Settings → Secrets and
-   variables → Actions**.
+1. Add the API key for your selected provider under the repository's **Settings
+   → Secrets and variables → Actions**: `CURRENTS_API_KEY` for Currents (the
+   default) or `GNEWS_API_KEY` for GNews.
 2. Set **Settings → Actions → General → Workflow permissions** to **Read and
    write permissions**.
 3. Ensure the workflow is present on the repository's default branch.
@@ -154,7 +166,8 @@ cp .env.example .env
 ```
 
 Do not commit `.env` or API keys. For GitHub Actions, configure
-`CURRENTS_API_KEY` as a repository secret.
+`CURRENTS_API_KEY` for the default provider or `GNEWS_API_KEY` when
+`ingestion.news_provider` is set to `gnews`.
 
 ## Scope and status
 

@@ -1,6 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, Field
@@ -20,9 +20,15 @@ class IngestionConfig(BaseModel):
 
     price_period: str
     price_interval: str
+    news_provider: Literal["currents", "gnews"] = "currents"
     news_page_size: int = Field(default=20, gt=0)
     news_chunk_days: int = Field(default=7, ge=2)
     news_max_pages: int = Field(default=3, ge=1)
+    gnews_max_articles: int = Field(default=10, ge=1, le=100)
+    gnews_chunk_days: int = Field(default=7, ge=2)
+    gnews_max_pages: int = Field(default=1, ge=1)
+    gnews_language: str = "en"
+    gnews_country: str | None = None
     bootstrap_days: int = Field(default=20, gt=0)
     news_overlap_sessions: int = Field(default=2, ge=0)
 

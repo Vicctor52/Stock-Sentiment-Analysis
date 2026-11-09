@@ -29,9 +29,15 @@ def _settings() -> SimpleNamespace:
         ingestion=SimpleNamespace(
             price_period="12mo",
             price_interval="1d",
+            news_provider="currents",
             news_page_size=50,
             news_chunk_days=7,
             news_max_pages=3,
+            gnews_max_articles=10,
+            gnews_chunk_days=7,
+            gnews_max_pages=1,
+            gnews_language="en",
+            gnews_country=None,
         ),
     )
 
@@ -74,11 +80,47 @@ def test_run_ingestion_writes_prices_and_news(
 
     assert price_calls == [(["NVDA", "AAPL"], "12mo", "1d")]
     assert news_calls[0][0] == ["NVDA", "AAPL"]
+    assert news_calls[0][1]["provider"] == "currents"
     assert news_calls[0][1]["page_size"] == 50
     assert news_calls[0][1]["chunk_days"] == 7
     assert news_calls[0][1]["max_pages"] == 3
     store = FakeStore.instances[0]
     assert set(store.writes) == {"prices", "news"}
+
+
+def test_run_ingestion_passes_gnews_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    FakeStore.instances.clear()
+    news_calls = []
+    settings = _settings()
+    settings.ingestion.news_provider = "gnews"
+    settings.ingestion.gnews_max_articles = 10
+    settings.ingestion.gnews_chunk_days = 7
+    settings.ingestion.gnews_max_pages = 2
+    settings.ingestion.gnews_language = "en"
+    settings.ingestion.gnews_country = "us"
+
+    def fake_news(tickers, **kwargs):
+        news_calls.append((tickers, kwargs))
+        return _news()
+
+    monkeypatch.setattr(ingest, "load_settings", lambda: settings)
+    monkeypatch.setattr(ingest, "load_tickers", lambda: {"tickers": ["NVDA"]})
+    monkeypatch.setattr(ingest, "ParquetStore", FakeStore)
+    monkeypatch.setattr(ingest, "fetch_prices", lambda *args, **kwargs: _prices())
+    monkeypatch.setattr(ingest, "fetch_news", fake_news)
+
+    ingest.run_ingestion()
+
+    assert news_calls[0][1] == {
+        "provider": "gnews",
+        "gnews_max_articles": 10,
+        "gnews_chunk_days": 7,
+        "gnews_max_pages": 2,
+        "gnews_language": "en",
+        "gnews_country": "us",
+    }
 
 
 def test_run_ingestion_skips_news_without_api_key(

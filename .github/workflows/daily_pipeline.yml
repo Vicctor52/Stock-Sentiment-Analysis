@@ -45,13 +45,20 @@ jobs:
           path: ~/.cache/huggingface
           key: hf-${{ hashFiles('requirements-pipeline.txt') }}
       - run: uv pip install -r requirements-pipeline.txt
-      - name: Require Currents API credentials
-        run: test -n "$CURRENTS_API_KEY"
+      - name: Require news API credentials
+        run: |
+          provider=$(uv run python -c "from finsent.config import load_settings; print(load_settings().ingestion.news_provider)")
+          case "$provider" in
+            gnews) test -n "$GNEWS_API_KEY" ;;
+            *) test -n "$CURRENTS_API_KEY" ;;
+          esac
         env:
           CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
+          GNEWS_API_KEY: ${{ secrets.GNEWS_API_KEY }}
       - run: uv run python -m finsent daily
         env:
           CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
+          GNEWS_API_KEY: ${{ secrets.GNEWS_API_KEY }}
       - name: Persist processed data
         run: |
           git config user.name "github-actions[bot]"

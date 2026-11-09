@@ -5,6 +5,7 @@ import pytest
 import requests
 
 from finsent.ingestion import news
+from finsent.ingestion.providers import currents, gnews
 from finsent.storage.schemas import NEWS_ARTICLES_COLUMNS
 
 
@@ -36,7 +37,43 @@ def _install_fake_client(monkeypatch: pytest.MonkeyPatch, handler) -> list[dict[
             calls.append(kwargs)
             return handler(kwargs, calls)
 
-    monkeypatch.setattr(news, "CurrentsNewsClient", FakeCurrentsClient)
+    monkeypatch.setattr(currents, "CurrentsNewsClient", FakeCurrentsClient)
+    return calls
+
+
+def _gnews_article(
+    title: str = "GNews headline",
+    url: str = "https://news.example.com/article",
+    published: str = "2024-01-02T20:30:00Z",
+    **extra: object,
+) -> dict[str, object]:
+    article: dict[str, object] = {
+        "title": title,
+        "description": "GNews description",
+        "content": "GNews content",
+        "url": url,
+        "publishedAt": published,
+        "source": {"name": "Example News", "url": "https://news.example.com"},
+    }
+    article.update(extra)
+    return article
+
+
+def _install_fake_gnews_client(
+    monkeypatch: pytest.MonkeyPatch,
+    handler,
+) -> list[dict[str, object]]:
+    calls: list[dict[str, object]] = []
+
+    class FakeGNewsClient:
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
+
+        def search(self, **kwargs: object) -> dict[str, object]:
+            calls.append(kwargs)
+            return handler(kwargs, calls)
+
+    monkeypatch.setattr(gnews, "GNewsClient", FakeGNewsClient)
     return calls
 
 
@@ -170,11 +207,11 @@ def test_fetch_news_rate_limit_always_aborts(
     monkeypatch.setenv("CURRENTS_API_KEY", "test-key")
 
     def handler(kwargs, calls):
-        raise news.CurrentsRateLimitError("quota exhausted")
+        raise currents.CurrentsRateLimitError("quota exhausted")
 
     _install_fake_client(monkeypatch, handler)
 
-    with pytest.raises(news.CurrentsRateLimitError):
+    with pytest.raises(currents.CurrentsRateLimitError):
         news.fetch_news(["NVDA"])
 
 
@@ -265,6 +302,109 @@ def test_fetch_news_without_tickers_returns_empty_frame(
     assert list(result.columns) == NEWS_ARTICLES_COLUMNS
 
 
+def test_fetch_news_uses_gnews_when_requested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GNEWS_API_KEY", "test-key")
+    calls = _install_fake_gnews_client(
+        monkeypatch,
+        lambda kwargs, calls: {
+            "totalArticles": 1,
+            "articles": [_gnews_article()],
+        },
+    )
+
+    result = news.fetch_news(["NVDA"], provider="gnews")
+
+    assert [call["query"] for call in calls] == ["NVDA"]
+    assert calls[0]["language"] == "en"
+    assert calls[0]["max_articles"] == 10
+    assert calls[0]["country"] is None
+    assert list(result.columns) == NEWS_ARTICLES_COLUMNS
+    assert result["ticker"].tolist() == ["NVDA"]
+    assert result["source_name"].tolist() == ["Example News"]
+    assert result["content"].tolist() == ["GNews content"]
+    assert result["description"].tolist() == ["GNews description"]
+    assert pd.api.types.is_datetime64_any_dtype(result["published_utc"])
+    assert result["published_utc"].dt.tz is not None
+
+
+def test_fetch_news_gnews_excludes_articles_at_or_after_to_date(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GNEWS_API_KEY", "test-key")
+    _install_fake_gnews_client(
+        monkeypatch,
+        lambda kwargs, calls: {
+            "totalArticles": 2,
+            "articles": [
+                _gnews_article(
+                    title="Before close",
+                    url="https://news.example.com/before",
+                    published="2024-01-02T20:59:59Z",
+                ),
+                _gnews_article(
+                    title="At close",
+                    url="https://news.example.com/at-close",
+                    published="2024-01-02T21:00:00Z",
+                ),
+            ],
+        },
+    )
+
+    result = news.fetch_news(
+        ["NVDA"],
+        provider="gnews",
+        from_date="2024-01-02T13:00:00+00:00",
+        to_date="2024-01-02T21:00:00+00:00",
+    )
+
+    assert result["title"].tolist() == ["Before close"]
+
+
+def test_fetch_news_gnews_paginates_until_short_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GNEWS_API_KEY", "test-key")
+
+    def handler(kwargs, calls):
+        page = int(kwargs["page_number"])
+        if page == 1:
+            articles = [
+                _gnews_article(url="https://news.example.com/1"),
+                _gnews_article(url="https://news.example.com/2"),
+            ]
+        else:
+            articles = [_gnews_article(url="https://news.example.com/3")]
+        return {"totalArticles": 3, "articles": articles}
+
+    calls = _install_fake_gnews_client(monkeypatch, handler)
+
+    result = news.fetch_news(
+        ["NVDA"],
+        provider="gnews",
+        gnews_max_articles=2,
+        gnews_max_pages=2,
+    )
+
+    assert [call["page_number"] for call in calls] == [1, 2]
+    assert len(result) == 3
+
+
+def test_fetch_news_gnews_requires_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("GNEWS_API_KEY", raising=False)
+
+    with pytest.raises(ValueError, match="GNEWS_API_KEY"):
+        news.fetch_news(["NVDA"], provider="gnews")
+
+
+def test_fetch_news_rejects_unknown_provider() -> None:
+    with pytest.raises(ValueError, match="Unsupported news provider"):
+        news.fetch_news(["NVDA"], provider="unknown")
+
+
 class FakeResponse:
     def __init__(
         self,
@@ -294,9 +434,9 @@ def test_currents_client_sends_bearer_token_and_params(monkeypatch) -> None:
         captured.update(kwargs)
         return FakeResponse(200, {"status": "ok", "news": [], "page": 1})
 
-    monkeypatch.setattr(news.requests, "get", fake_get)
+    monkeypatch.setattr(currents.requests, "get", fake_get)
 
-    client = news.CurrentsNewsClient("secret")
+    client = currents.CurrentsNewsClient("secret")
     payload = client.search(
         keywords="NVDA",
         start_date="2024-01-01T00:00:00Z",
@@ -306,7 +446,7 @@ def test_currents_client_sends_bearer_token_and_params(monkeypatch) -> None:
     )
 
     assert payload["status"] == "ok"
-    assert captured["url"] == news._CURRENTS_SEARCH_URL
+    assert captured["url"] == currents._CURRENTS_SEARCH_URL
     assert captured["headers"] == {"Authorization": "Bearer secret"}
     assert captured["params"] == {
         "keywords": "NVDA",
@@ -319,13 +459,13 @@ def test_currents_client_sends_bearer_token_and_params(monkeypatch) -> None:
 
 def test_currents_client_reports_rate_limit(monkeypatch) -> None:
     monkeypatch.setattr(
-        news.requests,
+        currents.requests,
         "get",
         lambda url, **kwargs: FakeResponse(429, headers={"Retry-After": "30"}),
     )
 
-    with pytest.raises(news.CurrentsRateLimitError, match="30"):
-        news.CurrentsNewsClient("secret").search(keywords="NVDA")
+    with pytest.raises(currents.CurrentsRateLimitError, match="30"):
+        currents.CurrentsNewsClient("secret").search(keywords="NVDA")
 
 
 def test_currents_client_retries_burst_rate_limit(monkeypatch) -> None:
@@ -342,10 +482,10 @@ def test_currents_client_retries_burst_rate_limit(monkeypatch) -> None:
     ]
 
     sleeps: list[float] = []
-    monkeypatch.setattr(news.time, "sleep", sleeps.append)
-    monkeypatch.setattr(news.requests, "get", lambda url, **kwargs: responses.pop(0))
+    monkeypatch.setattr(currents.time, "sleep", sleeps.append)
+    monkeypatch.setattr(currents.requests, "get", lambda url, **kwargs: responses.pop(0))
 
-    payload = news.CurrentsNewsClient("secret", min_interval=0).search(keywords="NVDA")
+    payload = currents.CurrentsNewsClient("secret", min_interval=0).search(keywords="NVDA")
 
     assert payload["status"] == "ok"
     assert sleeps == [1.0]
@@ -353,10 +493,69 @@ def test_currents_client_retries_burst_rate_limit(monkeypatch) -> None:
 
 def test_currents_client_reports_bad_request(monkeypatch) -> None:
     monkeypatch.setattr(
-        news.requests,
+        currents.requests,
         "get",
         lambda url, **kwargs: FakeResponse(400, text="bad date range"),
     )
 
-    with pytest.raises(news.CurrentsAPIError, match="bad date range"):
-        news.CurrentsNewsClient("secret").search(keywords="NVDA")
+    with pytest.raises(currents.CurrentsAPIError, match="bad date range"):
+        currents.CurrentsNewsClient("secret").search(keywords="NVDA")
+
+
+def test_gnews_client_sends_api_key_and_params(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_get(url, **kwargs):
+        captured["url"] = url
+        captured.update(kwargs)
+        return FakeResponse(200, {"totalArticles": 0, "articles": []})
+
+    monkeypatch.setattr(gnews.requests, "get", fake_get)
+
+    client = gnews.GNewsClient("secret")
+    payload = client.search(
+        query="NVDA",
+        from_date="2024-01-01T00:00:00Z",
+        to_date="2024-01-07T00:00:00Z",
+        page_number=2,
+        max_articles=5,
+        language="en",
+        country="us",
+    )
+
+    assert payload["articles"] == []
+    assert captured["url"] == gnews._GNEWS_SEARCH_URL
+    assert captured["params"] == {
+        "q": "NVDA",
+        "lang": "en",
+        "max": 5,
+        "page": 2,
+        "nullable": "description,content,image",
+        "sortby": "publishedAt",
+        "apikey": "secret",
+        "from": "2024-01-01T00:00:00Z",
+        "to": "2024-01-07T00:00:00Z",
+        "country": "us",
+    }
+
+
+def test_gnews_client_reports_rate_limit(monkeypatch) -> None:
+    monkeypatch.setattr(
+        gnews.requests,
+        "get",
+        lambda url, **kwargs: FakeResponse(429, headers={"Retry-After": "30"}),
+    )
+
+    with pytest.raises(gnews.GNewsRateLimitError, match="30"):
+        gnews.GNewsClient("secret").search(query="NVDA")
+
+
+def test_gnews_client_reports_bad_request(monkeypatch) -> None:
+    monkeypatch.setattr(
+        gnews.requests,
+        "get",
+        lambda url, **kwargs: FakeResponse(400, text="invalid api key"),
+    )
+
+    with pytest.raises(gnews.GNewsAPIError, match="invalid api key"):
+        gnews.GNewsClient("secret").search(query="NVDA")
