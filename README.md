@@ -13,29 +13,36 @@ The screenshots show the current dashboard using the locally available
 processed data. They are point-in-time examples; displayed values will change
 as the dataset expands.
 
+
+### Overview charts and ticker filtering
+
+
+The overview shows the latest sentiment metrics, the daily sentiment index and the daily 
+log returns for the selected tickers, giving a quick snapshot of the collected news data.
+
+
 <img src="docs/images/dashboard-overview.png" alt="Dashboard overview" width="600" />
 
-### Daily returns and ticker filtering
+The first chart compares the daily sentiment index for the different tickers across time. It is obtained by using 
+the model FinBERT to analyze different news related to tickers
 
- 
 
 
-The returns view compares daily log returns across tickers. The ticker filter
-can also isolate one company and show its sentiment and returns together.
+<p align="center">
+  <img src="docs/images/daily%20logs.png" alt="Daily log returns compared across tickers" width="100%">
+  <br><em>Daily log returns</em>
+  <br>Each line represents a ticker's daily log return, making it easier to compare their movements across market sessions.
+</p>
 
-<table>
-  <tr>
-    <td align="center">
-      <img src="docs/images/daily%20logs.png" alt="Daily log returns compared across tickers" width="110%">
-      <br><em>Daily log returns</em>
-    </td>
-    <td align="center">
-      <img src="docs/images/AAPL_filter.png" alt="Daily sentiment and log returns filtered to AAPL" width="110%">
-      <br><em>Sentiment and returns filtered to AAPL</em>
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <img src="docs/images/AAPL_filter.png" alt="Daily sentiment and log returns filtered to AAPL" width="100%">
+  <br><em>Sentiment and returns filtered to AAPL</em>
+  <br>With AAPL selected, the dashboard shows its daily sentiment index and log returns, aligned by trading session.
+</p>
 
+The second chart compares daily log returns across tickers. The second filters
+the dashboard to AAPL, so its daily sentiment index and log returns can be
+viewed together over the same period.
 
 
 ### Granger and lead lag correlation analysis
@@ -45,10 +52,12 @@ can also isolate one company and show its sentiment and returns together.
     <td align="center">
       <img src="docs/images/dashboard-lead-lag.png" alt="Lead-lag correlation results by ticker" width="100%">
       <br><em>Lead-lag analysis</em>
+      <br><small>Correlation results summarize the relationship between sentiment and returns at different session lags, including adjusted p-values and observation counts.</small>
     </td>
     <td align="center">
       <img src="docs/images/dashboard-granger.png" alt="Granger test results by ticker" width="100%">
       <br><em>Granger analysis</em>
+      <br><small>Granger test statistics show whether past sentiment helps explain returns at tested lags; with the current small sample, these results are exploratory.</small>
     </td>
   </tr>
 </table>
