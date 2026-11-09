@@ -17,6 +17,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Require local bootstrap data
+        run: |
+          missing=0
+          for path in \
+            data/processed/pipeline_state.json \
+            data/processed/prices.parquet \
+            data/processed/news.parquet \
+            data/processed/daily_sentiment.parquet \
+            data/processed/returns.parquet; do
+            if [ ! -f "$path" ]; then
+              echo "Missing bootstrap file: $path" >&2
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Run the first bootstrap locally (uv run python -m finsent daily)," \
+                 "commit data/processed, and push before using this workflow." >&2
+            exit 1
+          fi
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true

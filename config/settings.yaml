@@ -11,6 +11,8 @@ ingestion:
   price_period: 12mo
   price_interval: 1d
   news_page_size: 100
+  bootstrap_days: 20
+  news_overlap_sessions: 2
 
 analysis:
   lags: [0, 1, 2]

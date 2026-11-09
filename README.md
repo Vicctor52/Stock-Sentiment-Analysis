@@ -71,16 +71,52 @@ uv run streamlit run streamlit_app.py
 The `daily` command reads the last successfully processed session from
 `data/processed/pipeline_state.json`, fetches news between session closes,
 updates prices, scores only new articles, and recalculates the analysis. It
-catches up on missed sessions after weekends, holidays, or failed runs. On its
-first run, it downloads the configured price lookback and news from the prior
-session close through the latest completed session.
+catches up on missed sessions after weekends, holidays, or failed runs.
+
+On its first run (when no checkpoint exists), it bootstraps a 20-calendar-day
+window ending on the latest completed session. Prices and news are aligned to
+NYSE session boundaries: prices include one prior session as the seed for the
+first log return, and news starts at that prior session close so the first
+session includes overnight and pre-market articles. Tune
+`ingestion.bootstrap_days` and `ingestion.news_overlap_sessions` in
+`config/settings.yaml` if needed.
+
+Every later run re-fetches `news_overlap_sessions` (default 2) already processed
+sessions before the checkpoint. Duplicate articles and sentiment rows are
+discarded by the Parquet primary keys, so the overlap only recovers items that a
+delayed NewsAPI response did not return on the previous run.
+
+## First local bootstrap and GitHub Actions handoff
+
+Run the first `daily` execution locally, then commit the generated Parquet files
+and the checkpoint before enabling the scheduled workflow:
+
+```bash
+uv run python -m finsent daily
+git add -f data/processed/*.parquet data/processed/pipeline_state.json
+git commit -m "chore(data): bootstrap 20-day pipeline window"
+git push
+```
+
+The processed data directory is ignored by Git, so `-f` is required. Upload the
+Parquet files and the checkpoint together; committing only the checkpoint would
+leave the scheduled run without historical data.
+
+The scheduled workflow refuses to run when the bootstrap checkpoint or the core
+Parquet tables are missing. This prevents a heavy bootstrap from running in CI.
+Once the checkpoint is on the default branch, each scheduled run continues from
+`last_processed_session` and only processes newer sessions.
+
+Run the bootstrap before the next weekday 22:30 UTC scheduled run, or pause the
+workflow while publishing, to avoid a local/CI race.
 
 ## Daily GitHub Actions workflow
 
 The [daily pipeline workflow](.github/workflows/daily_pipeline.yml) is scheduled
 for weekdays at 22:30 UTC and can also be started manually from the Actions tab.
 It commits processed Parquet files and the session checkpoint back to the
-repository, so repository history grows as data accumulates.
+repository, so repository history grows as data accumulates. Before running the
+pipeline, it verifies that the local bootstrap data and checkpoint are present.
 
 To enable it:
 

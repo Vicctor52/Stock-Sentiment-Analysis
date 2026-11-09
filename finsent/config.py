@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ModelConfig(BaseModel):
@@ -21,6 +21,8 @@ class IngestionConfig(BaseModel):
     price_period: str
     price_interval: str
     news_page_size: int
+    bootstrap_days: int = Field(default=20, gt=0)
+    news_overlap_sessions: int = Field(default=2, ge=0)
 
 
 class AnalysisConfig(BaseModel):
