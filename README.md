@@ -8,7 +8,7 @@ prices to study lead-lag relationships between news sentiment and returns.
 ```mermaid
 flowchart LR
     Y[yfinance] --> ING[Ingestion]
-    N[NewsAPI] --> ING
+    N[Currents API] --> ING
     ING --> NRM[UTC normalization + NYSE sessions]
     NRM --> PQ[(Parquet)]
     PQ --> NLP[Cleaning + FinBERT]
@@ -77,14 +77,22 @@ On its first run (when no checkpoint exists), it bootstraps a 20-calendar-day
 window ending on the latest completed session. Prices and news are aligned to
 NYSE session boundaries: prices include one prior session as the seed for the
 first log return, and news starts at that prior session close so the first
-session includes overnight and pre-market articles. Tune
+session includes overnight and pre-market articles. The news window is
+half-open: it ends just before the target session close, so articles published
+exactly at the closing bell belong to the next session. Tune
 `ingestion.bootstrap_days` and `ingestion.news_overlap_sessions` in
 `config/settings.yaml` if needed.
+
+News ingestion uses the Currents API. Its free plan caps each search at 7
+calendar days and 20 results, so the ingestion layer splits date ranges into
+7-day windows and fetches up to `ingestion.news_max_pages` pages (3 by default)
+per ticker and window. The 20-day bootstrap needs about 60 base requests and up
+to 180 with pagination, below the free daily quota of 250.
 
 Every later run re-fetches `news_overlap_sessions` (default 2) already processed
 sessions before the checkpoint. Duplicate articles and sentiment rows are
 discarded by the Parquet primary keys, so the overlap only recovers items that a
-delayed NewsAPI response did not return on the previous run.
+delayed Currents API response did not return on the previous run.
 
 ## First local bootstrap and GitHub Actions handoff
 
@@ -120,8 +128,8 @@ pipeline, it verifies that the local bootstrap data and checkpoint are present.
 
 To enable it:
 
-1. Add `NEWSAPI_KEY` under the repository's **Settings → Secrets and variables
-   → Actions**.
+1. Add `CURRENTS_API_KEY` under the repository's **Settings → Secrets and
+   variables → Actions**.
 2. Set **Settings → Actions → General → Workflow permissions** to **Read and
    write permissions**.
 3. Ensure the workflow is present on the repository's default branch.
@@ -145,8 +153,8 @@ Copy `.env.example` to `.env` and add the credentials required for local runs:
 cp .env.example .env
 ```
 
-Do not commit `.env` or API keys. For GitHub Actions, configure `NEWSAPI_KEY` as
-a repository secret.
+Do not commit `.env` or API keys. For GitHub Actions, configure
+`CURRENTS_API_KEY` as a repository secret.
 
 ## Scope and status
 

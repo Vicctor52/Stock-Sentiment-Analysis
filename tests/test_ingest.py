@@ -30,6 +30,8 @@ def _settings() -> SimpleNamespace:
             price_period="12mo",
             price_interval="1d",
             news_page_size=50,
+            news_chunk_days=7,
+            news_max_pages=3,
         ),
     )
 
@@ -58,8 +60,8 @@ def test_run_ingestion_writes_prices_and_news(
         price_calls.append((tickers, period, interval))
         return _prices()
 
-    def fake_news(tickers, page_size):
-        news_calls.append((tickers, page_size))
+    def fake_news(tickers, **kwargs):
+        news_calls.append((tickers, kwargs))
         return _news()
 
     monkeypatch.setattr(ingest, "load_settings", _settings)
@@ -71,7 +73,10 @@ def test_run_ingestion_writes_prices_and_news(
     ingest.run_ingestion()
 
     assert price_calls == [(["NVDA", "AAPL"], "12mo", "1d")]
-    assert news_calls == [(["NVDA", "AAPL"], 50)]
+    assert news_calls[0][0] == ["NVDA", "AAPL"]
+    assert news_calls[0][1]["page_size"] == 50
+    assert news_calls[0][1]["chunk_days"] == 7
+    assert news_calls[0][1]["max_pages"] == 3
     store = FakeStore.instances[0]
     assert set(store.writes) == {"prices", "news"}
 
@@ -81,8 +86,8 @@ def test_run_ingestion_skips_news_without_api_key(
 ) -> None:
     FakeStore.instances.clear()
 
-    def fake_news(tickers, page_size):
-        raise ValueError("NEWSAPI_KEY environment variable not set")
+    def fake_news(tickers, **kwargs):
+        raise ValueError("CURRENTS_API_KEY environment variable not set")
 
     monkeypatch.setattr(ingest, "load_settings", _settings)
     monkeypatch.setattr(ingest, "load_tickers", lambda: {"tickers": ["NVDA"]})
@@ -110,7 +115,6 @@ def test_run_ingestion_skips_empty_news(
         "fetch_news",
         lambda *args, **kwargs: pd.DataFrame(columns=NEWS_ARTICLES_COLUMNS),
     )
-
     ingest.run_ingestion()
 
     store = FakeStore.instances[0]

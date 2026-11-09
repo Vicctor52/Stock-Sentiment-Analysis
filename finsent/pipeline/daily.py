@@ -53,7 +53,8 @@ def _bootstrap_window(
     session. The first NYSE session inside that window anchors both datasets.
     Prices start one session earlier so the first session has a prior close for
     the log-return calculation, and news starts at that prior close so the
-    first session includes overnight and pre-market articles.
+    first session includes overnight and pre-market articles. The news window
+    ends before the target session close.
     """
     start_date = (target_session - pd.Timedelta(days=bootstrap_days - 1)).date()
     start_session = _session_date(
@@ -114,7 +115,7 @@ def run_daily_pipeline(now: pd.Timestamp | None = None) -> None:
         )
         logger.info(
             "Bootstrapping %d calendar days from session %s through %s; "
-            "collecting news from %s through %s.",
+            "collecting news from %s up to (excluding) %s.",
             settings.ingestion.bootstrap_days,
             start_session.date(),
             target_session.date(),
@@ -139,7 +140,8 @@ def run_daily_pipeline(now: pd.Timestamp | None = None) -> None:
         price_start = (last_processed + pd.Timedelta(days=1)).date().isoformat()
         price_end = (target_session + pd.Timedelta(days=1)).date().isoformat()
         logger.info(
-            "Processing NYSE sessions after %s through %s; collecting news from %s through %s.",
+            "Processing NYSE sessions after %s through %s; collecting news from %s up to "
+            "(excluding) %s.",
             last_processed.date(),
             target_session.date(),
             news_from,

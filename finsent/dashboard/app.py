@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from finsent.config import load_settings
+from finsent.dashboard.charts import build_returns_chart, build_sentiment_chart
 from finsent.dashboard.data import DashboardData, load_dashboard_data
 
 
@@ -61,15 +62,13 @@ def main() -> None:
             st.metric("Latest sentiment", f"{latest_sentiment:.3f}")
             st.caption(f"Latest sentiment session: {latest_date:%Y-%m-%d}")
             st.subheader("Daily sentiment index")
-            sentiment_chart = sentiment.sort_values("session_date").set_index("session_date")
-            st.line_chart(sentiment_chart, y="sentiment_index", color="ticker")
+            st.plotly_chart(build_sentiment_chart(sentiment), use_container_width=True)
         elif "daily_sentiment" not in data.missing_tables:
             st.info("The daily sentiment file contains no observations.")
 
-        if not returns.empty:
+        if not returns.empty and returns["log_return"].notna().any():
             st.subheader("Daily log returns")
-            returns_chart = returns.sort_values("session_date").set_index("session_date")
-            st.line_chart(returns_chart, y="log_return", color="ticker")
+            st.plotly_chart(build_returns_chart(returns), use_container_width=True)
         elif "returns" not in data.missing_tables:
             st.info("The returns file contains no observations.")
 

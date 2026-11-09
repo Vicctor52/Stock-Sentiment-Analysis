@@ -20,7 +20,9 @@ class IngestionConfig(BaseModel):
 
     price_period: str
     price_interval: str
-    news_page_size: int
+    news_page_size: int = Field(default=20, gt=0)
+    news_chunk_days: int = Field(default=7, ge=2)
+    news_max_pages: int = Field(default=3, ge=1)
     bootstrap_days: int = Field(default=20, gt=0)
     news_overlap_sessions: int = Field(default=2, ge=0)
 

@@ -16,7 +16,7 @@ def clean_text(text: str | None) -> str:
         text: Raw text to clean.
 
     Returns:
-        The cleaned text with HTML, URLs, NewsAPI truncation markers, and
+        The cleaned text with HTML, URLs, provider truncation markers, and
         repeated whitespace removed.
     """
     if not isinstance(text, str):

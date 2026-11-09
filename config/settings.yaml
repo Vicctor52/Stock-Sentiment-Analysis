@@ -10,7 +10,9 @@ model:
 ingestion:
   price_period: 12mo
   price_interval: 1d
-  news_page_size: 100
+  news_page_size: 20
+  news_chunk_days: 7
+  news_max_pages: 3
   bootstrap_days: 20
   news_overlap_sessions: 2
 

@@ -24,7 +24,7 @@ def run_ingestion(
     4. Fetches recent news for each ticker.
     5. Persists news to ``data/processed/news.parquet``.
 
-    News ingestion is skipped when ``NEWSAPI_KEY`` is not configured. Both
+    News ingestion is skipped when ``CURRENTS_API_KEY`` is not configured. Both
     tables are deduplicated by their primary keys via ``ParquetStore``.
     """
     settings = load_settings()
@@ -64,16 +64,21 @@ def run_ingestion(
     logger.info("Price ingestion complete. %d rows saved.", len(prices))
 
     try:
+        news_kwargs = {
+            "page_size": settings.ingestion.news_page_size,
+            "chunk_days": settings.ingestion.news_chunk_days,
+            "max_pages": settings.ingestion.news_max_pages,
+        }
         if strict or news_from is not None:
             news = fetch_news(
                 tickers,
-                page_size=settings.ingestion.news_page_size,
                 from_date=news_from,
                 to_date=news_to,
                 strict=strict,
+                **news_kwargs,
             )
         else:
-            news = fetch_news(tickers, page_size=settings.ingestion.news_page_size)
+            news = fetch_news(tickers, **news_kwargs)
     except ValueError as exc:
         if strict:
             raise

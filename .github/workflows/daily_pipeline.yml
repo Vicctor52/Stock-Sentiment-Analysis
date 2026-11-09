@@ -45,13 +45,13 @@ jobs:
           path: ~/.cache/huggingface
           key: hf-${{ hashFiles('requirements-pipeline.txt') }}
       - run: uv pip install -r requirements-pipeline.txt
-      - name: Require NewsAPI credentials
-        run: test -n "$NEWSAPI_KEY"
+      - name: Require Currents API credentials
+        run: test -n "$CURRENTS_API_KEY"
         env:
-          NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+          CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
       - run: uv run python -m finsent daily
         env:
-          NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+          CURRENTS_API_KEY: ${{ secrets.CURRENTS_API_KEY }}
       - name: Persist processed data
         run: |
           git config user.name "github-actions[bot]"
