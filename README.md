@@ -40,7 +40,7 @@ the model FinBERT to analyze different news related to tickers
   <br>With AAPL selected, the dashboard shows its daily sentiment index and log returns, aligned by trading session.
 </p>
 
-The second chart compares daily log returns across tickers. The second filters
+The second chart compares daily log returns across tickers. The third filters
 the dashboard to AAPL, so its daily sentiment index and log returns can be
 viewed together over the same period.
 
@@ -89,7 +89,9 @@ meaningfully assessed.
   false-discovery-rate correction.
 - Presents the processed data and analysis in a Streamlit dashboard.
 
+## Scope
 
+The project currently collects and processes financial news and market-price data for a configurable set of stocks. Its primary focus is to build a growing, reliable historical dataset through automated daily ingestion. As the dataset expands, it will provide a stronger foundation for analyzing how news sentiment relates to market returns and for evaluating predictive approaches.
 
 ## Future plans
 
@@ -244,7 +246,4 @@ tests/         unit and synthetic tests
 Never commit `.env` or API keys. For GitHub Actions, configure the selected
 provider key as a repository secret.
 
-## Scope
 
-The current project focuses on news and market prices. Social media and
-regulatory filings are out of scope.
