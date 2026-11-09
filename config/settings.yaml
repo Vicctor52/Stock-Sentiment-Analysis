@@ -14,6 +14,11 @@ ingestion:
   news_page_size: 20
   news_chunk_days: 7
   news_max_pages: 3
+  news_keyword_whitelist:
+    META: ["Meta Platforms", "Meta stock", "Meta earnings", "Facebook"]
+    COST: ["Costco", "Costco Wholesale", "COST stock"]
+  news_keyword_exclude:
+    META: ["metadata", "vuldb"]
   gnews_max_articles: 10
   gnews_chunk_days: 7
   gnews_max_pages: 1

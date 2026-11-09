@@ -26,6 +26,7 @@ def fetch_news(
     gnews_max_pages: int = 1,
     gnews_language: str = "en",
     gnews_country: str | None = None,
+    keywords: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Fetch recent news articles for each ticker from a news provider.
 
@@ -48,6 +49,10 @@ def fetch_news(
         gnews_max_pages: Maximum GNews pages fetched per ticker and date window.
         gnews_language: GNews language code. Defaults to English.
         gnews_country: Optional GNews country code.
+        keywords: Per‑ticker search query strings.  If provided, each ticker's
+            query will be taken from this dict instead of being built from the
+            ticker symbol alone.  This is useful when you want exact‑phrase matches
+            or to exclude confounding terms such as ``metadata`` for the ticker ``META``.
 
     Returns:
         A normalized DataFrame with one row per article and ticker. Columns:
@@ -77,6 +82,7 @@ def fetch_news(
             language=gnews_language,
             country=gnews_country,
             strict=strict,
+            keywords=keywords or {},
         )
 
     return fetch_currents(
@@ -87,4 +93,5 @@ def fetch_news(
         chunk_days=chunk_days,
         max_pages=max_pages,
         strict=strict,
+        keywords=keywords or {},
     )

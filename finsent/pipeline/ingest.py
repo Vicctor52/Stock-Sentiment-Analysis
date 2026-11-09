@@ -66,7 +66,23 @@ def run_ingestion(
 
     try:
         provider = settings.ingestion.news_provider
-        news_kwargs: dict[str, object]
+        # Build per‑ticker search keywords from the whitelist / exclude config
+        whitelist = getattr(settings.ingestion, "news_keyword_whitelist", {}) or {}
+        exclude = getattr(settings.ingestion, "news_keyword_exclude", {}) or {}
+
+        keywords: dict[str, str] = {}
+        for ticker in tickers:
+            phrases = whitelist.get(ticker, [])
+            if phrases:
+                query = " OR ".join(f'"{p}"' for p in phrases)
+            else:
+                query = ticker
+            exc = exclude.get(ticker, [])
+            if exc:
+                exc_str = " ".join(f"-{e}" for e in exc)
+                query = f"{query} {exc_str}"
+            keywords[ticker] = query
+
         if provider == "gnews":
             news_kwargs = {
                 "provider": "gnews",
@@ -75,6 +91,7 @@ def run_ingestion(
                 "gnews_max_pages": settings.ingestion.gnews_max_pages,
                 "gnews_language": settings.ingestion.gnews_language,
                 "gnews_country": settings.ingestion.gnews_country,
+                "keywords": keywords,
             }
         else:
             news_kwargs = {
@@ -82,6 +99,7 @@ def run_ingestion(
                 "page_size": settings.ingestion.news_page_size,
                 "chunk_days": settings.ingestion.news_chunk_days,
                 "max_pages": settings.ingestion.news_max_pages,
+                "keywords": keywords,
             }
         if strict or news_from is not None:
             news = fetch_news(

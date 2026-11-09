@@ -28,6 +28,8 @@ def test_ingestion_config_accepts_bootstrap_window() -> None:
     assert config.news_page_size == 20
     assert config.news_chunk_days == 7
     assert config.news_max_pages == 3
+    assert config.news_keyword_whitelist == {}
+    assert config.news_keyword_exclude == {}
     assert config.gnews_max_articles == 10
     assert config.gnews_chunk_days == 7
     assert config.gnews_max_pages == 1
@@ -63,6 +65,16 @@ def test_ingestion_config_accepts_gnews_provider() -> None:
 
     assert config.news_provider == "gnews"
     assert config.gnews_country == "us"
+
+
+def test_ingestion_config_accepts_news_keyword_filters() -> None:
+    config = _ingestion_config(
+        news_keyword_whitelist={"META": ["Meta Platforms", "Facebook"]},
+        news_keyword_exclude={"META": ["metadata"]},
+    )
+
+    assert config.news_keyword_whitelist == {"META": ["Meta Platforms", "Facebook"]}
+    assert config.news_keyword_exclude == {"META": ["metadata"]}
 
 
 def test_ingestion_config_rejects_unknown_news_provider() -> None:

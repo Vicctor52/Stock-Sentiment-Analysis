@@ -24,6 +24,8 @@ class IngestionConfig(BaseModel):
     news_page_size: int = Field(default=20, gt=0)
     news_chunk_days: int = Field(default=7, ge=2)
     news_max_pages: int = Field(default=3, ge=1)
+    news_keyword_whitelist: dict[str, list[str]] = Field(default_factory=dict)
+    news_keyword_exclude: dict[str, list[str]] = Field(default_factory=dict)
     gnews_max_articles: int = Field(default=10, ge=1, le=100)
     gnews_chunk_days: int = Field(default=7, ge=2)
     gnews_max_pages: int = Field(default=1, ge=1)

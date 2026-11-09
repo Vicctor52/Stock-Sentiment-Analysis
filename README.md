@@ -1,9 +1,100 @@
 # Financial Sentiment Lab
 
-A financial sentiment analysis pipeline that combines market news and stock
-prices to study lead-lag relationships between news sentiment and returns.
+An ongoing financial data project that combines market news, FinBERT sentiment
+analysis, and stock returns to explore how news sentiment relates to market
+behavior.
 
-## Architecture
+The project includes an automated data pipeline and an interactive dashboard.
+It is designed to grow over time as new market sessions are collected.
+
+## Dashboard preview
+
+The screenshots show the current dashboard using the locally available
+processed data. They are point-in-time examples; displayed values will change
+as the dataset expands.
+
+<img src="docs/images/dashboard-overview.png" alt="Dashboard overview" width="600" />
+
+### Daily returns and ticker filtering
+
+ 
+
+
+The returns view compares daily log returns across tickers. The ticker filter
+can also isolate one company and show its sentiment and returns together.
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/images/daily%20logs.png" alt="Daily log returns compared across tickers" width="110%">
+      <br><em>Daily log returns</em>
+    </td>
+    <td align="center">
+      <img src="docs/images/AAPL_filter.png" alt="Daily sentiment and log returns filtered to AAPL" width="110%">
+      <br><em>Sentiment and returns filtered to AAPL</em>
+    </td>
+  </tr>
+</table>
+
+
+
+### Granger and lead lag correlation analysis
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/images/dashboard-lead-lag.png" alt="Lead-lag correlation results by ticker" width="100%">
+      <br><em>Lead-lag analysis</em>
+    </td>
+    <td align="center">
+      <img src="docs/images/dashboard-granger.png" alt="Granger test results by ticker" width="100%">
+      <br><em>Granger analysis</em>
+    </td>
+  </tr>
+</table>
+
+
+
+## Project status and data limitations
+
+This is a long-term project: a scheduled GitHub Actions workflow is set up to
+collect and process new data on weekdays. After the initial local bootstrap
+and workflow setup, each successful run updates the processed data and its
+checkpoint so the historical dataset can keep growing.
+
+There are currently too few observations to take the analysis results
+seriously. Daily sentiment indices, lead-lag correlations, and Granger test
+results are preliminary and should not be treated as reliable conclusions.
+The project needs a substantially larger dataset before these results can be
+meaningfully assessed.
+
+
+
+## What it does
+
+- Ingests stock prices from yfinance and financial news from Currents or GNews.
+- Normalizes timestamps to UTC and assigns news to NYSE trading sessions.
+- Cleans article text and scores it with FinBERT.
+- Aggregates article sentiment by ticker and session.
+- Calculates log returns, lead-lag correlations, and Granger tests with
+  false-discovery-rate correction.
+- Presents the processed data and analysis in a Streamlit dashboard.
+
+
+
+## Future plans
+
+- **Move data storage to the cloud:** keep the repository focused on code and
+  use cloud storage for the growing historical dataset.
+- **Add predictive modeling:** once enough data has accumulated, evaluate
+  whether sentiment can support reliable out-of-sample predictions.
+- **Backfill historical data:** extend the current dataset further into the
+  past while preserving the existing data format and pipeline.
+- **Publish the dashboard online:** keep a hosted version available so it can
+  be explored without cloning or downloading the repository.
+
+
+## How the pipeline works
 
 ```mermaid
 flowchart LR
@@ -19,7 +110,105 @@ flowchart LR
     RES --> DASH[Streamlit + Plotly]
 ```
 
-## Project layout
+The daily command processes data through the latest completed NYSE session.
+Its first run bootstraps a configurable **20-calendar-day** window by default
+(this is not 20 trading sessions). Prices include a prior session to seed the
+first log return. News is assigned to sessions using exchange close times.
+
+After bootstrap, the pipeline uses a checkpoint to continue from the last
+successfully processed session and catches up after missed runs. It re-fetches
+a small overlap of recent sessions to recover delayed news; duplicate articles
+and sentiment rows are discarded.
+
+## Quick start
+
+### Requirements
+
+- Python 3.12
+- [uv](https://docs.astral.sh/uv/)
+- An API key for the configured news provider (`CURRENTS_API_KEY` by default)
+
+### Install and configure
+
+```bash
+uv venv --python 3.12
+uv pip install -r requirements-pipeline.txt
+cp .env.example .env
+```
+
+Add your news provider API key to `.env`. Use `GNEWS_API_KEY` if
+`ingestion.news_provider` is set to `gnews` in `config/settings.yaml`.
+
+### Bootstrap data and open the dashboard
+
+The repository does not include a ready-to-use sample dataset. Run the daily
+pipeline once to fetch and process the initial data:
+
+```bash
+uv run python -m finsent daily
+uv run streamlit run streamlit_app.py
+```
+
+The first run also downloads FinBERT model files and scores the collected
+articles, so it may take longer than subsequent runs. The dashboard reads
+Parquet files from `data/processed`; without those files, there is no local
+history to display.
+
+Individual pipeline stages are available when needed:
+
+```bash
+uv run python -m finsent ingest
+uv run python -m finsent score
+uv run python -m finsent analyze
+```
+
+## Automated data collection
+
+The [daily pipeline workflow](.github/workflows/daily_pipeline.yml) is
+scheduled for weekdays at **22:30 UTC** and can also be started manually from
+the GitHub Actions tab. It updates the processed Parquet files and checkpoint
+in the repository, allowing data to persist between temporary GitHub Actions
+runners.
+
+Before enabling the scheduled workflow:
+
+1. Run `uv run python -m finsent daily` locally for the initial bootstrap.
+2. Commit and push the processed tables and checkpoint:
+
+   ```bash
+   git add -f data/processed/*.parquet data/processed/pipeline_state.json
+   git commit -m "chore(data): bootstrap pipeline"
+   git push
+   ```
+
+3. Add the selected provider key (`CURRENTS_API_KEY` or `GNEWS_API_KEY`) under
+   the repository's **Settings → Secrets and variables → Actions**.
+4. Set **Settings → Actions → General → Workflow permissions** to **Read and
+   write permissions**, and ensure the workflow is on the default branch.
+
+The workflow checks for the bootstrap checkpoint and required Parquet tables
+before running. It will not start a bootstrap on its temporary runner. The
+dashboard reads local files; it does not fetch the workflow's data from GitHub
+automatically. To view newer results locally, pull the repository changes and
+reload the dashboard.
+
+## News providers
+
+Currents is the default provider. Its free plan limits searches to 7 calendar
+days and 20 results, so the pipeline splits date ranges into 7-day windows and
+fetches up to `ingestion.news_max_pages` pages per ticker and window (3 by
+default).
+
+GNews can be selected with `ingestion.news_provider: gnews`. Its settings use
+7-day windows by default, up to 10 articles per request, and one page per
+ticker and window. The free plan has a 100-request daily quota, limits history
+to 30 days, and may not return articles from the most recent 12 hours. For
+near-real-time daily runs, use Currents or a GNews plan without that delay.
+
+Other ingestion settings, including tickers, model, date windows, and analysis
+lags, are in `config/settings.yaml` and `config/tickers.yaml`.
+
+## Project structure
 
 ```text
 finsent/
@@ -31,147 +220,22 @@ finsent/
   dashboard/   Streamlit application
 config/        ticker and application settings
 data/          raw, processed, cache, and sample data
+docs/images/   dashboard screenshots used in this README
 tests/         unit and synthetic tests
 ```
 
-## Requirements
-
-- Python 3.12
-- [uv](https://docs.astral.sh/uv/)
-
-Install the pipeline dependencies:
-
-```bash
-uv venv --python 3.12
-uv pip install -r requirements-pipeline.txt
-```
-
-## Usage
-
-Run individual pipeline stages:
-
-```bash
-uv run python -m finsent ingest
-uv run python -m finsent score
-uv run python -m finsent analyze
-```
-
-Run the incremental pipeline through the latest completed NYSE session:
-
-```bash
-uv run python -m finsent daily
-```
-
-Start the dashboard:
-
-```bash
-uv run streamlit run streamlit_app.py
-```
-
-The `daily` command reads the last successfully processed session from
-`data/processed/pipeline_state.json`, fetches news between session closes,
-updates prices, scores only new articles, and recalculates the analysis. It
-catches up on missed sessions after weekends, holidays, or failed runs.
-
-On its first run (when no checkpoint exists), it bootstraps a 20-calendar-day
-window ending on the latest completed session. Prices and news are aligned to
-NYSE session boundaries: prices include one prior session as the seed for the
-first log return, and news starts at that prior session close so the first
-session includes overnight and pre-market articles. The news window is
-half-open: it ends just before the target session close, so articles published
-exactly at the closing bell belong to the next session. Tune
-`ingestion.bootstrap_days` and `ingestion.news_overlap_sessions` in
-`config/settings.yaml` if needed.
-
-News ingestion uses the Currents API by default and can switch to GNews by
-setting `ingestion.news_provider` to `gnews` in `config/settings.yaml`.
-
-The Currents free plan caps each search at 7 calendar days and 20 results, so
-the ingestion layer splits date ranges into 7-day windows and fetches up to
-`ingestion.news_max_pages` pages (3 by default) per ticker and window. The
-20-day bootstrap needs about 60 base requests and up to 180 with pagination,
-below the free daily quota of 250.
-
-The GNews provider reads its own `gnews_*` settings: 7-day windows by default,
-`gnews_max_articles` per request (10), and `gnews_max_pages` pages (1) per ticker
-and window. The GNews free plan allows 100 requests per day, 10 articles per
-request, and at most 30 days of history. It also limits the `to` parameter to at
-least 12 hours ago, so a free-plan run at 22:30 UTC may not return the latest
-session's articles. Use a paid GNews plan or keep Currents for real-time daily
-runs.
-
-Every later run re-fetches `news_overlap_sessions` (default 2) already processed
-sessions before the checkpoint. Duplicate articles and sentiment rows are
-discarded by the Parquet primary keys, so the overlap only recovers items that a
-delayed provider response did not return on the previous run.
-
-## First local bootstrap and GitHub Actions handoff
-
-Run the first `daily` execution locally, then commit the generated Parquet files
-and the checkpoint before enabling the scheduled workflow:
-
-```bash
-uv run python -m finsent daily
-git add -f data/processed/*.parquet data/processed/pipeline_state.json
-git commit -m "chore(data): bootstrap 20-day pipeline window"
-git push
-```
-
-The processed data directory is ignored by Git, so `-f` is required. Upload the
-Parquet files and the checkpoint together; committing only the checkpoint would
-leave the scheduled run without historical data.
-
-The scheduled workflow refuses to run when the bootstrap checkpoint or the core
-Parquet tables are missing. This prevents a heavy bootstrap from running in CI.
-Once the checkpoint is on the default branch, each scheduled run continues from
-`last_processed_session` and only processes newer sessions.
-
-Run the bootstrap before the next weekday 22:30 UTC scheduled run, or pause the
-workflow while publishing, to avoid a local/CI race.
-
-## Daily GitHub Actions workflow
-
-The [daily pipeline workflow](.github/workflows/daily_pipeline.yml) is scheduled
-for weekdays at 22:30 UTC and can also be started manually from the Actions tab.
-It commits processed Parquet files and the session checkpoint back to the
-repository, so repository history grows as data accumulates. Before running the
-pipeline, it verifies that the local bootstrap data and checkpoint are present.
-
-To enable it:
-
-1. Add the API key for your selected provider under the repository's **Settings
-   → Secrets and variables → Actions**: `CURRENTS_API_KEY` for Currents (the
-   default) or `GNEWS_API_KEY` for GNews.
-2. Set **Settings → Actions → General → Workflow permissions** to **Read and
-   write permissions**.
-3. Ensure the workflow is present on the repository's default branch.
-
-GitHub Actions runs on a temporary runner. Committing processed data is how
-this workflow persists results between runs; the dashboard does not fetch those
-results from GitHub automatically.
-
-## Dashboard
-
-The dashboard reads analysis Parquet files from `data/processed` and displays
-daily sentiment, log returns, lead-lag results, and Granger results. Use
-**Reload data** after updating the files. If required tables are missing, the
-app identifies them and tells you which pipeline stages to run.
-
 ## Environment variables
 
-Copy `.env.example` to `.env` and add the credentials required for local runs:
+`.env.example` lists the supported local variables:
 
-```bash
-cp .env.example .env
-```
+- `CURRENTS_API_KEY` — required when using Currents.
+- `GNEWS_API_KEY` — required when using GNews.
+- `HF_TOKEN` — optional Hugging Face token for model downloads.
 
-Do not commit `.env` or API keys. For GitHub Actions, configure
-`CURRENTS_API_KEY` for the default provider or `GNEWS_API_KEY` when
-`ingestion.news_provider` is set to `gnews`.
+Never commit `.env` or API keys. For GitHub Actions, configure the selected
+provider key as a repository secret.
 
-## Scope and status
+## Scope
 
-The project currently focuses on news and market prices. Social media and
-regulatory filings are out of scope. News ingestion, FinBERT scoring, daily
-sentiment aggregation, return analysis, lead-lag analysis, Granger tests, and
-the connected dashboard are implemented.
+The current project focuses on news and market prices. Social media and
+regulatory filings are out of scope.

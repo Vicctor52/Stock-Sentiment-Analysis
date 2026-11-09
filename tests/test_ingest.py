@@ -38,6 +38,8 @@ def _settings() -> SimpleNamespace:
             gnews_max_pages=1,
             gnews_language="en",
             gnews_country=None,
+            news_keyword_whitelist={},
+            news_keyword_exclude={},
         ),
     )
 
@@ -120,6 +122,39 @@ def test_run_ingestion_passes_gnews_settings(
         "gnews_max_pages": 2,
         "gnews_language": "en",
         "gnews_country": "us",
+        "keywords": {"NVDA": "NVDA"},
+    }
+
+
+def test_run_ingestion_builds_whitelist_and_exclude_queries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    FakeStore.instances.clear()
+    news_calls = []
+    settings = _settings()
+    settings.ingestion.news_keyword_whitelist = {
+        "META": ["Meta Platforms", "Meta stock", "Meta earnings", "Facebook"],
+    }
+    settings.ingestion.news_keyword_exclude = {
+        "META": ["metadata"],
+    }
+
+    def fake_news(tickers, **kwargs):
+        news_calls.append((tickers, kwargs))
+        return _news()
+
+    monkeypatch.setattr(ingest, "load_settings", lambda: settings)
+    monkeypatch.setattr(ingest, "load_tickers", lambda: {"tickers": ["META", "AAPL"]})
+    monkeypatch.setattr(ingest, "ParquetStore", FakeStore)
+    monkeypatch.setattr(ingest, "fetch_prices", lambda *args, **kwargs: _prices())
+    monkeypatch.setattr(ingest, "fetch_news", fake_news)
+
+    ingest.run_ingestion()
+
+    expected_meta = '"Meta Platforms" OR "Meta stock" OR "Meta earnings" OR "Facebook" -metadata'
+    assert news_calls[0][1]["keywords"] == {
+        "META": expected_meta,
+        "AAPL": "AAPL",
     }
 
 

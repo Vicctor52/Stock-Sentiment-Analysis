@@ -177,6 +177,7 @@ def _fetch_ticker(
     page_size: int,
     max_pages: int,
     ingested_at: pd.Timestamp,
+    keywords: str | None = None,
 ) -> list[dict[str, object]]:
     """Fetch and normalize articles for one ticker across date windows."""
     rows: list[dict[str, object]] = []
@@ -186,7 +187,7 @@ def _fetch_ticker(
 
         for page in range(1, max_pages + 1):
             payload = client.search(
-                keywords=ticker,
+                keywords=keywords if keywords else ticker,
                 start_date=start_date,
                 end_date=end_date,
                 page_number=page,
@@ -218,6 +219,7 @@ def fetch_currents(
     chunk_days: int = 7,
     max_pages: int = 3,
     strict: bool = False,
+    keywords: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Fetch and normalize news from the Currents API."""
     api_key = os.getenv("CURRENTS_API_KEY")
@@ -242,16 +244,21 @@ def fetch_currents(
 
     client = CurrentsNewsClient(api_key)
     ingested_at = pd.Timestamp.now(tz="UTC")
-    return collect_news(
-        tickers,
-        lambda ticker: _fetch_ticker(
+
+    def _ticker_fetch(ticker: str) -> list[dict[str, object]]:
+        return _fetch_ticker(
             client,
             ticker,
             windows,
             page_size,
             max_pages,
             ingested_at,
-        ),
+            keywords=keywords.get(ticker) if keywords else None,
+        )
+
+    return collect_news(
+        tickers,
+        _ticker_fetch,
         provider_label="Currents API",
         strict=strict,
         to_date=to_date,

@@ -107,6 +107,20 @@ def test_fetch_news_queries_each_ticker_and_deduplicates(
     assert result["published_utc"].dt.tz is not None
 
 
+def test_fetch_news_passes_custom_currents_keywords(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CURRENTS_API_KEY", "test-key")
+    calls = _install_fake_client(
+        monkeypatch,
+        lambda kwargs, calls: {"status": "ok", "news": [], "page": 1},
+    )
+
+    news.fetch_news(["META"], keywords={"META": '"Meta Platforms" -metadata'})
+
+    assert calls[0]["keywords"] == '"Meta Platforms" -metadata'
+
+
 def test_fetch_news_article_id_is_stable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CURRENTS_API_KEY", "test-key")
     _install_fake_client(
@@ -327,6 +341,24 @@ def test_fetch_news_uses_gnews_when_requested(
     assert result["description"].tolist() == ["GNews description"]
     assert pd.api.types.is_datetime64_any_dtype(result["published_utc"])
     assert result["published_utc"].dt.tz is not None
+
+
+def test_fetch_news_passes_custom_gnews_keywords(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GNEWS_API_KEY", "test-key")
+    calls = _install_fake_gnews_client(
+        monkeypatch,
+        lambda kwargs, calls: {"totalArticles": 0, "articles": []},
+    )
+
+    news.fetch_news(
+        ["META"],
+        provider="gnews",
+        keywords={"META": '"Meta Platforms" -metadata'},
+    )
+
+    assert calls[0]["query"] == '"Meta Platforms" -metadata'
 
 
 def test_fetch_news_gnews_excludes_articles_at_or_after_to_date(

@@ -168,6 +168,7 @@ def _fetch_ticker(
     language: str,
     country: str | None,
     ingested_at: pd.Timestamp,
+    keywords: str | None = None,
 ) -> list[dict[str, object]]:
     """Fetch and normalize articles for one ticker across date windows."""
     rows: list[dict[str, object]] = []
@@ -177,7 +178,7 @@ def _fetch_ticker(
 
         for page in range(1, max_pages + 1):
             payload = client.search(
-                query=ticker,
+                query=keywords if keywords else ticker,
                 from_date=start_date,
                 to_date=end_date,
                 page_number=page,
@@ -228,6 +229,7 @@ def fetch_gnews(
     language: str = "en",
     country: str | None = None,
     strict: bool = False,
+    keywords: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Fetch and normalize news from the GNews API."""
     api_key = os.getenv("GNEWS_API_KEY")
@@ -254,9 +256,9 @@ def fetch_gnews(
 
     client = GNewsClient(api_key)
     ingested_at = pd.Timestamp.now(tz="UTC")
-    return collect_news(
-        tickers,
-        lambda ticker: _fetch_ticker(
+
+    def _ticker_fetch(ticker: str) -> list[dict[str, object]]:
+        return _fetch_ticker(
             client,
             ticker,
             windows,
@@ -265,7 +267,12 @@ def fetch_gnews(
             language,
             country,
             ingested_at,
-        ),
+            keywords=keywords.get(ticker) if keywords else None,
+        )
+
+    return collect_news(
+        tickers,
+        _ticker_fetch,
         provider_label="GNews API",
         strict=strict,
         to_date=to_date,
