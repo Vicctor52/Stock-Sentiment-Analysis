@@ -12,7 +12,7 @@ def _settings(processed_dir: Path) -> SimpleNamespace:
     return SimpleNamespace(
         storage=SimpleNamespace(processed_dir=processed_dir),
         market_calendar="NYSE",
-        ingestion=SimpleNamespace(bootstrap_days=20, news_overlap_sessions=2),
+        ingestion=SimpleNamespace(bootstrap_days=20),
     )
 
 
@@ -55,7 +55,7 @@ def test_daily_pipeline_skips_an_already_processed_session(monkeypatch, tmp_path
     assert calls == []
 
 
-def test_daily_pipeline_catches_up_after_weekend_with_news_overlap(monkeypatch, tmp_path):
+def test_daily_pipeline_catches_up_after_weekend_without_news_overlap(monkeypatch, tmp_path):
     (tmp_path / "pipeline_state.json").write_text(
         '{"last_processed_session": "2024-01-05"}',
         encoding="utf-8",
@@ -66,7 +66,7 @@ def test_daily_pipeline_catches_up_after_weekend_with_news_overlap(monkeypatch, 
     daily.run_daily_pipeline(pd.Timestamp("2024-01-08T22:00:00Z"))
 
     assert calls[0] == {
-        "news_from": "2024-01-03T21:00:00+00:00",
+        "news_from": "2024-01-05T21:00:00+00:00",
         "news_to": "2024-01-08T21:00:00+00:00",
         "price_start": "2024-01-06",
         "price_end": "2024-01-09",
@@ -77,7 +77,7 @@ def test_daily_pipeline_catches_up_after_weekend_with_news_overlap(monkeypatch, 
     )
 
 
-def test_daily_pipeline_processes_next_session_with_news_overlap(monkeypatch, tmp_path):
+def test_daily_pipeline_processes_next_session_without_news_overlap(monkeypatch, tmp_path):
     (tmp_path / "pipeline_state.json").write_text(
         '{"last_processed_session": "2024-01-09"}',
         encoding="utf-8",
@@ -88,7 +88,7 @@ def test_daily_pipeline_processes_next_session_with_news_overlap(monkeypatch, tm
     daily.run_daily_pipeline(pd.Timestamp("2024-01-10T22:00:00Z"))
 
     assert calls[0] == {
-        "news_from": "2024-01-05T21:00:00+00:00",
+        "news_from": "2024-01-09T21:00:00+00:00",
         "news_to": "2024-01-10T21:00:00+00:00",
         "price_start": "2024-01-10",
         "price_end": "2024-01-11",
@@ -125,14 +125,3 @@ def test_bootstrap_window_uses_calendar_days_and_seed_session():
     assert news_to == "2024-01-31T21:00:00+00:00"
     assert price_start == "2024-01-11"
     assert price_end == "2024-02-01"
-
-
-def test_overlap_session_moves_back_by_trading_sessions():
-    calendar = xcals.get_calendar("NYSE")
-
-    assert daily._overlap_session(calendar, pd.Timestamp("2024-01-09"), 0) == pd.Timestamp(
-        "2024-01-09"
-    )
-    assert daily._overlap_session(calendar, pd.Timestamp("2024-01-09"), 2) == pd.Timestamp(
-        "2024-01-05"
-    )

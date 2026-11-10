@@ -127,9 +127,9 @@ Its first run bootstraps a configurable **20-calendar-day** window by default
 first log return. News is assigned to sessions using exchange close times.
 
 After bootstrap, the pipeline uses a checkpoint to continue from the last
-successfully processed session and catches up after missed runs. It re-fetches
-a small overlap of recent sessions to recover delayed news; duplicate articles
-and sentiment rows are discarded.
+successfully processed session and catches up after missed runs. News
+collection starts at the checkpoint session's close, so already-processed
+sessions are not fetched again.
 
 ## Quick start
 
@@ -245,5 +245,4 @@ tests/         unit and synthetic tests
 
 Never commit `.env` or API keys. For GitHub Actions, configure the selected
 provider key as a repository secret.
-
 

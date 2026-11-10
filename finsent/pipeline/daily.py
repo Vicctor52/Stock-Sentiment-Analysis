@@ -31,17 +31,6 @@ def _latest_closed_session(calendar, now: pd.Timestamp) -> pd.Timestamp:
     return _session_date(session)
 
 
-def _overlap_session(
-    calendar,
-    session: pd.Timestamp,
-    overlap_sessions: int,
-) -> pd.Timestamp:
-    """Move a session label back by the requested number of sessions."""
-    for _ in range(max(0, overlap_sessions)):
-        session = calendar.previous_session(session)
-    return session
-
-
 def _bootstrap_window(
     calendar,
     target_session: pd.Timestamp,
@@ -130,12 +119,7 @@ def run_daily_pipeline(now: pd.Timestamp | None = None) -> None:
             strict=True,
         )
     else:
-        news_start_session = _overlap_session(
-            calendar,
-            last_processed,
-            settings.ingestion.news_overlap_sessions,
-        )
-        news_from = calendar.session_close(news_start_session).isoformat()
+        news_from = calendar.session_close(last_processed).isoformat()
         news_to = calendar.session_close(target_session).isoformat()
         price_start = (last_processed + pd.Timedelta(days=1)).date().isoformat()
         price_end = (target_session + pd.Timedelta(days=1)).date().isoformat()

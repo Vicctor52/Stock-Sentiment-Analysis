@@ -32,7 +32,6 @@ class IngestionConfig(BaseModel):
     gnews_language: str = "en"
     gnews_country: str | None = None
     bootstrap_days: int = Field(default=20, gt=0)
-    news_overlap_sessions: int = Field(default=2, ge=0)
 
 
 class AnalysisConfig(BaseModel):
